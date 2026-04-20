@@ -1,0 +1,38 @@
+[0.542s] Invoking command in '/home/parallels/workspace/auto_nav_team18': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/parallels/workspace/auto_nav_team18/build/auto_nav/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_nav build --build-base /home/parallels/workspace/auto_nav_team18/build/auto_nav/build install --record /home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log --single-version-externally-managed install_data
+[0.711s] running egg_info
+[0.723s] writing build/auto_nav/auto_nav.egg-info/PKG-INFO
+[0.723s] writing dependency_links to build/auto_nav/auto_nav.egg-info/dependency_links.txt
+[0.723s] writing entry points to build/auto_nav/auto_nav.egg-info/entry_points.txt
+[0.723s] writing requirements to build/auto_nav/auto_nav.egg-info/requires.txt
+[0.724s] writing top-level names to build/auto_nav/auto_nav.egg-info/top_level.txt
+[0.748s] reading manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+[0.748s] writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+[0.749s] running build
+[0.749s] running build_py
+[0.749s] running install
+[0.754s] running install_lib
+[0.768s] running install_data
+[0.768s] running install_egg_info
+[0.780s] removing '/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info' (and everything under it)
+[0.780s] Copying build/auto_nav/auto_nav.egg-info to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info
+[0.781s] running install_scripts
+[0.865s] Installing cmd_gate script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.865s] Installing cone_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.865s] Installing distance_estimator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.865s] Installing gamepad_watchdog script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.865s] Installing gap_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.865s] Installing home_pose_recorder script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.866s] Installing journey_logger script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.866s] Installing joy_mapper script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.866s] Installing local_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing mission_controller script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing mode_manager script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing object_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing obstacle_guard script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing path_follower script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing photo_capture script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing sim_init script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing summary_generator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] Installing weave_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.867s] writing list of installed files to '/home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log'
+[0.888s] Invoked command in '/home/parallels/workspace/auto_nav_team18' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/parallels/workspace/auto_nav_team18/build/auto_nav/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_nav build --build-base /home/parallels/workspace/auto_nav_team18/build/auto_nav/build install --record /home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log --single-version-externally-managed install_data

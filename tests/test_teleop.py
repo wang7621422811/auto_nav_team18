@@ -114,9 +114,10 @@ def _build_stubs():
 _Bool, _String, _Twist = _build_stubs()
 
 # Import nodes under test
-from auto_nav.teleop.joy_mapper_node   import JoyMapperNode    # noqa: E402
-from auto_nav.teleop.mode_manager_node import ModeManagerNode  # noqa: E402
-from auto_nav.teleop.cmd_gate_node     import CmdGateNode      # noqa: E402
+from auto_nav.teleop.joy_mapper_node       import JoyMapperNode        # noqa: E402
+from auto_nav.teleop.gamepad_watchdog_node import GamepadWatchdogNode  # noqa: E402
+from auto_nav.teleop.mode_manager_node     import ModeManagerNode      # noqa: E402
+from auto_nav.teleop.cmd_gate_node         import CmdGateNode          # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +176,28 @@ def _make_cmd_gate():
     return node
 
 
+def _make_gamepad_watchdog(
+    axis_deadman=5,
+    deadman_button=-1,
+    threshold=0.5,
+):
+    node = GamepadWatchdogNode.__new__(GamepadWatchdogNode)
+    node._logger = MagicMock()
+    node._axis_deadman = axis_deadman
+    node._deadman_button = deadman_button
+    node._deadman_threshold = threshold
+    node._connected = False
+    node._deadman_ok = False
+    node._pub_connected = MagicMock()
+    node._pub_deadman = MagicMock()
+    now = MagicMock()
+    clock = MagicMock()
+    clock.now.return_value = now
+    node.get_clock = MagicMock(return_value=clock)
+    node._last_joy_time = now
+    return node
+
+
 # ---------------------------------------------------------------------------
 # JoyMapperNode tests
 # ---------------------------------------------------------------------------
@@ -226,6 +249,45 @@ class TestJoyMapper(unittest.TestCase):
         node._joy_cb(_make_joy(buttons=buttons))
         last_call = node._pub_auto.publish.call_args[0][0]
         self.assertTrue(last_call.data)
+
+
+# ---------------------------------------------------------------------------
+# GamepadWatchdogNode tests
+# ---------------------------------------------------------------------------
+
+class TestGamepadWatchdog(unittest.TestCase):
+
+    def test_deadman_axis_exceeds_threshold(self):
+        node = _make_gamepad_watchdog(axis_deadman=5, deadman_button=-1)
+        axes = [0.0] * 8
+        axes[5] = 0.9
+        GamepadWatchdogNode._joy_cb(node, _make_joy(axes=axes))
+        last = node._pub_deadman.publish.call_args[0][0]
+        self.assertTrue(last.data)
+
+    def test_deadman_digital_button(self):
+        """Switch Pro: ZR as button index 7, no trigger axis."""
+        node = _make_gamepad_watchdog(axis_deadman=-1, deadman_button=7)
+        buttons = [0] * 12
+        buttons[7] = 1
+        GamepadWatchdogNode._joy_cb(node, _make_joy(buttons=buttons))
+        last = node._pub_deadman.publish.call_args[0][0]
+        self.assertTrue(last.data)
+
+    def test_deadman_button_takes_precedence_over_axis(self):
+        node = _make_gamepad_watchdog(axis_deadman=5, deadman_button=0)
+        axes = [0.0] * 8
+        axes[5] = 0.9
+        GamepadWatchdogNode._joy_cb(node, _make_joy(buttons=[0] * 12, axes=axes))
+        last = node._pub_deadman.publish.call_args[0][0]
+        self.assertFalse(last.data)
+
+    def test_deadman_button_pressed_sets_true(self):
+        node = _make_gamepad_watchdog(axis_deadman=5, deadman_button=0)
+        buttons = [1] + [0] * 11
+        GamepadWatchdogNode._joy_cb(node, _make_joy(buttons=buttons, axes=[0.0] * 8))
+        last = node._pub_deadman.publish.call_args[0][0]
+        self.assertTrue(last.data)
 
 
 # ---------------------------------------------------------------------------

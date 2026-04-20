@@ -1,0 +1,33 @@
+# Sim-specific cone detector parameters (Step G3).
+# Overrides config/camera.yaml for the Gazebo camera:
+#   - 640x480 (matches URDF camera resolution)
+#   - 62.4° HFOV (1.089 rad from URDF)
+#   - Wider / lower HSV thresholds because Gazebo's Ogre renderer
+#     reduces saturation vs. the real-world orange camera.yaml expects.
+
+cone_detector:
+  ros__parameters:
+    # Orange hue band — Gazebo renders ambient+diffuse=(1.0, 0.45, 0.0)
+    # as approx H=25°, so keep centre at H≈12 (OpenCV 0-179 scale).
+    hsv_h_low:         3
+    hsv_h_high:        35
+    # Lower S/V — Gazebo scene ambient (0.45) washes out saturation.
+    hsv_s_low:         50
+    hsv_v_low:         50
+    # Contour area — cones at 5 m fill ~300 px² at 640x480.
+    min_area_px:       50
+    max_area_px:       80000
+    # Aspect ratio — cylinders look more square than real cones.
+    min_aspect_ratio:  0.3
+    max_aspect_ratio:  6.0
+    depth_roi_px:      5
+    # Gazebo camera intrinsics (URDF: horizontal_fov = 1.089 rad = 62.4°).
+    camera_hfov_deg:   62.4
+    image_width:       640
+    image_height:      480
+
+photo_capture:
+  ros__parameters:
+    photo_dir:       "artifacts/photos"
+    save_raw_frames: true
+    jpeg_quality:    90

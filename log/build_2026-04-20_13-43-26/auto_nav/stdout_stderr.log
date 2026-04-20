@@ -1,0 +1,36 @@
+running egg_info
+writing build/auto_nav/auto_nav.egg-info/PKG-INFO
+writing dependency_links to build/auto_nav/auto_nav.egg-info/dependency_links.txt
+writing entry points to build/auto_nav/auto_nav.egg-info/entry_points.txt
+writing requirements to build/auto_nav/auto_nav.egg-info/requires.txt
+writing top-level names to build/auto_nav/auto_nav.egg-info/top_level.txt
+reading manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+running build
+running build_py
+running install
+running install_lib
+running install_data
+copying config/joystick.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+running install_egg_info
+removing '/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info' (and everything under it)
+Copying build/auto_nav/auto_nav.egg-info to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info
+running install_scripts
+Installing cmd_gate script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing cone_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing distance_estimator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing gamepad_watchdog script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing gap_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing home_pose_recorder script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing journey_logger script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing joy_mapper script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing local_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing mission_controller script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing mode_manager script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing object_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing obstacle_guard script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing path_follower script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing photo_capture script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing summary_generator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing weave_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+writing list of installed files to '/home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log'

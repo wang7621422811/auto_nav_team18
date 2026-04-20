@@ -1,0 +1,50 @@
+# ============================================================
+# Profile: Sony PS4 DualShock (Bluetooth / USB)
+# ============================================================
+# Switch profile with:  ros2 launch auto_nav teleop.launch.py gamepad:=ps4
+#
+# Physical layout (sensor_msgs/Joy indices, 0-based):
+#   axes[0]  Left stick X (→ turn)      axes[4]  R2 trigger
+#   axes[1]  Left stick Y (↑ forward)   axes[5]  L2 trigger
+#   axes[2]  L2 analog                  buttons[0]  Cross (✕)
+#   axes[3]  Right stick X              buttons[1]  Circle (◯)
+#   axes[4]  Right stick Y              buttons[2]  Square (□)
+#                                       buttons[3]  Triangle (△)
+# Verify your exact mapping with:  ros2 topic echo /joy
+# ============================================================
+
+/joy:
+  ros__parameters:
+    deadzone: 0.05
+    autorepeat_rate: 20.0
+    sticky_buttons: false
+    coalesce_interval_ms: 1
+
+/teleop_twist_joy:
+  ros__parameters:
+    axis_linear:
+      x: 1                 # Left stick vertical → forward / back
+    axis_angular:
+      yaw: 0               # Left stick horizontal → turn
+    scale_linear:
+      x: 0.5               # m/s per full axis deflection
+    scale_angular:
+      yaw: 1.0             # rad/s per full axis deflection
+    require_enable_button: false   # No extra "enable" button needed
+
+/gamepad_watchdog:
+  ros__parameters:
+    axis_deadman: 5        # R2 trigger axis  (range -1 … +1, fully pressed ≈ +1)
+    deadman_button: -1     # -1 = use axis, not button
+    deadman_threshold: 0.5
+    joy_timeout_sec: 1.0
+
+/joy_mapper:
+  ros__parameters:
+    btn_auto_mode: 0       # Cross (✕)   → enable AUTO
+    btn_manual_mode: 1     # Circle (◯)  → enable MANUAL
+    btn_emergency_stop: 3  # Triangle (△) → E-stop
+
+/cmd_gate:
+  ros__parameters:
+    gate_rate_hz: 10.0

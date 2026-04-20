@@ -1,17 +1,18 @@
 """
-teleop.launch.py — manual-drive layer (Step 0).
+teleop.launch.py — Step 1: full gamepad safety control layer.
 
 Assumes bringup.launch.py is already running (/joy live, chassis live).
 
-Starts:
-  joy_node          — if not already running from bringup (idempotent name guard)
-  teleop_twist_joy  — converts /joy → /cmd_vel_manual  (joy → twist)
-  gamepad_watchdog  — /deadman_ok / /joy_connected
-
-Note: /cmd_vel_manual is NOT sent to the chassis yet.
-      In Step 1, cmd_gate_node will route manual/auto through safety gate.
+Nodes started here:
+  joy_node          — gamepad → /joy
+  teleop_twist_joy  — /joy → /cmd_vel_manual
+  joy_mapper        — /joy → /joy/btn_* semantic topics
+  gamepad_watchdog  — /deadman_ok  /joy_connected
+  mode_manager      — /control_mode  /emergency_stop
+  cmd_gate          — arbitrates all sources → /cmd_vel_safe (chassis input)
 
 CLI arguments:
+  gamepad:=ps4          (default) or switch_pro  ← pick your controller
   joy_dev:=/dev/input/js0
   use_sim_time:=false
 """
@@ -20,19 +21,103 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
-def _cfg(filename: str) -> str:
-    return os.path.join(
-        get_package_share_directory('auto_nav'), 'config', filename
+def _nodes(context, *args, **kwargs):
+    """Resolve gamepad profile at launch time and create all nodes."""
+    gamepad      = context.launch_configurations.get('gamepad', 'ps4')
+    joy_dev      = context.launch_configurations.get('joy_dev', '/dev/input/js0')
+    use_sim_time = context.launch_configurations.get('use_sim_time', 'false')
+
+    cfg = os.path.join(
+        get_package_share_directory('auto_nav'),
+        'config', 'gamepad', f'{gamepad}.yaml',
     )
+
+    if not os.path.isfile(cfg):
+        raise FileNotFoundError(
+            f"[teleop] Unknown gamepad profile '{gamepad}'. "
+            f"Expected file: {cfg}. "
+            "Available: ps4, switch_pro"
+        )
+
+    sim_params = {'use_sim_time': use_sim_time == 'true'}
+
+    # ---- joy_node: gamepad driver → /joy ----------------------------------
+    joy_node = Node(
+        package='joy',
+        executable='joy_node',
+        name='joy',
+        output='screen',
+        parameters=[cfg, {'dev': joy_dev, **sim_params}],
+    )
+
+    # ---- teleop_twist_joy: /joy axes → /cmd_vel_manual --------------------
+    teleop_node = Node(
+        package='teleop_twist_joy',
+        executable='teleop_node',
+        name='teleop_twist_joy',
+        output='screen',
+        parameters=[cfg, sim_params],
+        remappings=[('/cmd_vel', '/cmd_vel_manual')],
+    )
+
+    # ---- joy_mapper: /joy buttons → semantic Bool topics ------------------
+    joy_mapper_node = Node(
+        package='auto_nav',
+        executable='joy_mapper',
+        name='joy_mapper',
+        output='screen',
+        parameters=[cfg, sim_params],
+    )
+
+    # ---- gamepad_watchdog: monitors /joy timestamps -----------------------
+    watchdog_node = Node(
+        package='auto_nav',
+        executable='gamepad_watchdog',
+        name='gamepad_watchdog',
+        output='screen',
+        parameters=[cfg, sim_params],
+    )
+
+    # ---- mode_manager: state machine → /control_mode ----------------------
+    mode_manager_node = Node(
+        package='auto_nav',
+        executable='mode_manager',
+        name='mode_manager',
+        output='screen',
+        parameters=[sim_params],
+    )
+
+    # ---- cmd_gate: safety arbiter → /cmd_vel_safe -------------------------
+    cmd_gate_node = Node(
+        package='auto_nav',
+        executable='cmd_gate',
+        name='cmd_gate',
+        output='screen',
+        parameters=[cfg, sim_params],
+    )
+
+    return [
+        LogInfo(msg=f'[teleop] gamepad profile: {gamepad}  ({cfg})'),
+        joy_node,
+        teleop_node,
+        joy_mapper_node,
+        watchdog_node,
+        mode_manager_node,
+        cmd_gate_node,
+    ]
 
 
 def generate_launch_description() -> LaunchDescription:
-    args = [
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'gamepad', default_value='ps4',
+            description='Gamepad profile: ps4 | switch_pro',
+        ),
         DeclareLaunchArgument(
             'joy_dev', default_value='/dev/input/js0',
             description='Joystick device path',
@@ -41,59 +126,6 @@ def generate_launch_description() -> LaunchDescription:
             'use_sim_time', default_value='false',
             description='Use simulation clock',
         ),
-    ]
-
-    joy_dev      = LaunchConfiguration('joy_dev')
-    use_sim_time = LaunchConfiguration('use_sim_time')
-
-    joy_node = Node(
-        package='joy',
-        executable='joy_node',
-        name='joy',
-        output='screen',
-        parameters=[
-            _cfg('joystick.yaml'),
-            {'dev': joy_dev, 'use_sim_time': use_sim_time},
-        ],
-    )
-
-    # teleop_twist_joy: reads /joy, publishes to /cmd_vel_manual
-    # Config keys follow the teleop_twist_joy parameter schema.
-    teleop_node = Node(
-        package='teleop_twist_joy',
-        executable='teleop_node',
-        name='teleop_twist_joy',
-        output='screen',
-        parameters=[
-            _cfg('joystick.yaml'),
-            {
-                # Map our param names to teleop_twist_joy conventions
-                'axis_linear.x':        LaunchConfiguration('joy_dev'),   # re-used arg
-                'use_sim_time':         use_sim_time,
-                # Actual axes/buttons come from joystick.yaml loaded above
-            },
-        ],
-        remappings=[
-            ('/cmd_vel', '/cmd_vel_manual'),  # safety gate reads this in Step 1
-        ],
-    )
-
-    watchdog_node = Node(
-        package='auto_nav',
-        executable='gamepad_watchdog',
-        name='gamepad_watchdog',
-        output='screen',
-        parameters=[
-            _cfg('joystick.yaml'),
-            {'use_sim_time': use_sim_time},
-        ],
-    )
-
-    return LaunchDescription(
-        args + [
-            LogInfo(msg='=== auto_nav teleop layer ==='),
-            joy_node,
-            teleop_node,
-            watchdog_node,
-        ]
-    )
+        LogInfo(msg='=== auto_nav Step 1: gamepad safety control ==='),
+        OpaqueFunction(function=_nodes),
+    ])

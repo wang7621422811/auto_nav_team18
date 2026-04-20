@@ -1,3 +1,19 @@
 [console_scripts]
+cmd_gate = auto_nav.teleop.cmd_gate_node:main
+cone_detector = auto_nav.perception.cone_detector:main
+distance_estimator = auto_nav.perception.distance_estimator:main
 gamepad_watchdog = auto_nav.teleop.gamepad_watchdog_node:main
+gap_planner = auto_nav.navigation.gap_planner:main
 home_pose_recorder = auto_nav.mission.home_pose_recorder:main
+journey_logger = auto_nav.mission.journey_logger:main
+joy_mapper = auto_nav.teleop.joy_mapper_node:main
+local_planner = auto_nav.navigation.local_planner:main
+mission_controller = auto_nav.mission.mission_controller:main
+mode_manager = auto_nav.teleop.mode_manager_node:main
+object_detector = auto_nav.perception.object_detector:main
+obstacle_guard = auto_nav.navigation.obstacle_guard:main
+path_follower = auto_nav.navigation.path_follower:main
+photo_capture = auto_nav.perception.photo_capture:main
+sim_init = auto_nav.simulation.sim_bringup.sim_init_node:main
+summary_generator = auto_nav.mission.summary_generator:main
+weave_planner = auto_nav.navigation.weave_planner:main

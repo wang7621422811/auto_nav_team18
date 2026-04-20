@@ -1,26 +1,68 @@
-# Joystick / gamepad mapping for Sony DualShock / generic Bluetooth gamepad.
-# All indices follow sensor_msgs/Joy convention (0-based).
-# Change values here when switching controller models — never hardcode in nodes.
+# Multi-node ROS 2 parameter file. Top-level keys MUST match running node names
+# (see launch: Node(name='...')), NOT a logical name like "joystick". Otherwise
+# nothing is applied — e.g. deadman_button would never reach gamepad_watchdog.
+#
+# evtest codes (BTN_TL2=312, BTN_TR2=313) are kernel key codes; they are NOT the
+# same as sensor_msgs/Joy buttons[] indices. Always verify with:
+#   ros2 topic echo /joy
+# Press ZL/ZR alone and see which buttons[] entries flip (often 6/7 on Switch Pro,
+# but drivers differ — trust /joy, not evtest index).
 
-joystick:
+/joy:
   ros__parameters:
-    # ------- Axis indices -------
-    axis_linear_x: 1          # Left stick vertical   → forward/back
-    axis_angular_z: 0         # Left stick horizontal → turn
-    axis_deadman: 5           # Right trigger (RT / R2) — auto dead-man
+    deadzone: 0.5
+    autorepeat_rate: 20.0
+    sticky_buttons: false
+    coalesce_interval_ms: 1
 
-    # ------- Button indices -------
-    btn_auto_mode: 0          # X (cross) button   → enable AUTO mode
-    btn_manual_mode: 1        # O (circle) button  → enable MANUAL mode
-    btn_emergency_stop: 3     # △ (triangle)       → immediate E-stop
+# teleop_twist_joy (ROS 2 Jazzy+) uses nested axis_linear / axis_angular, not axis_linear_x.
+/teleop_twist_joy:
+  ros__parameters:
+    axis_linear:
+      x: 1
+    axis_angular:
+      yaw: 2
+    scale_linear:
+      x: 0.5
+    scale_angular:
+      yaw: 1.0
+    # Default true would force holding enable_button (often 0) to publish cmd_vel — conflicts with mode buttons.
+    require_enable_button: false
 
-    # ------- Scaling -------
-    scale_linear: 0.5         # m/s per unit axis deflection
-    scale_angular: 1.0        # rad/s per unit axis deflection
+/gamepad_watchdog:
+  ros__parameters:
+    axis_deadman: -1
+    # ZR (BTN_TR2 in evtest) — set to the index that goes 1 when you press ZR in `ros2 topic echo /joy`
+    deadman_button: 7
+    deadman_threshold: 0.5
+    joy_timeout_sec: 1.0
 
-    # ------- Dead-man threshold -------
-    # Trigger axis range is [-1.0 … +1.0]; fully pressed ≈ +1.0
-    deadman_threshold: 0.5    # trigger must exceed this to allow AUTO motion
+/joy_mapper:
+  ros__parameters:
+    btn_auto_mode: 0
+    btn_manual_mode: 1
+    btn_emergency_stop: 3
 
-    # ------- Watchdog -------
-    joy_timeout_sec: 1.0      # seconds of silence before declaring disconnect
+/cmd_gate:
+  ros__parameters:
+    gate_rate_hz: 10.0
+
+# -----------------------------------------------------------------------------
+# Reference — DualShock / generic (RT axis deadman): replace /gamepad_watchdog and
+# /teleop_twist_joy blocks with something like:
+#
+# /teleop_twist_joy:
+#   ros__parameters:
+#     axis_linear: { x: 1 }
+#     axis_angular: { yaw: 0 }
+#     scale_linear: { x: 0.5 }
+#     scale_angular: { yaw: 1.0 }
+#     require_enable_button: false
+#
+# /gamepad_watchdog:
+#   ros__parameters:
+#     axis_deadman: 5
+#     deadman_button: -1
+#     deadman_threshold: 0.5
+#     joy_timeout_sec: 1.0
+# -----------------------------------------------------------------------------

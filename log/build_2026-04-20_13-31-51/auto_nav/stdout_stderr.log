@@ -1,0 +1,113 @@
+running egg_info
+writing build/auto_nav/auto_nav.egg-info/PKG-INFO
+writing dependency_links to build/auto_nav/auto_nav.egg-info/dependency_links.txt
+writing entry points to build/auto_nav/auto_nav.egg-info/entry_points.txt
+writing requirements to build/auto_nav/auto_nav.egg-info/requires.txt
+writing top-level names to build/auto_nav/auto_nav.egg-info/top_level.txt
+reading manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+running build
+running build_py
+copying auto_nav/teleop/cmd_gate_node.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+copying auto_nav/teleop/joy_mapper_node.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+copying auto_nav/teleop/mode_manager_node.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception
+copying auto_nav/perception/cone_detector.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception
+copying auto_nav/perception/distance_estimator.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception
+copying auto_nav/perception/shape_classifier.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception
+copying auto_nav/perception/photo_capture.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception
+copying auto_nav/perception/object_detector.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception
+copying auto_nav/perception/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception
+creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/path_follower.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/geo_localizer.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/final_approach.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/weave_planner.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/waypoint_provider.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/local_planner.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/gap_planner.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/navigation/obstacle_guard.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation
+copying auto_nav/mission/mission_events.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+copying auto_nav/mission/mission_controller.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+copying auto_nav/mission/journey_logger.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+copying auto_nav/mission/summary_generator.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+running install
+running install_lib
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop/cmd_gate_node.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop/joy_mapper_node.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop/mode_manager_node.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception/cone_detector.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception/distance_estimator.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception/shape_classifier.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception/photo_capture.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception/object_detector.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/perception/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/path_follower.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/geo_localizer.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/final_approach.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/weave_planner.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/waypoint_provider.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/local_planner.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/gap_planner.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/navigation/obstacle_guard.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/mission_events.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/mission_controller.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/journey_logger.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/summary_generator.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/cmd_gate_node.py to cmd_gate_node.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/joy_mapper_node.py to joy_mapper_node.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/mode_manager_node.py to mode_manager_node.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception/cone_detector.py to cone_detector.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception/distance_estimator.py to distance_estimator.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception/shape_classifier.py to shape_classifier.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception/photo_capture.py to photo_capture.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception/object_detector.py to object_detector.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/perception/__init__.py to __init__.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/path_follower.py to path_follower.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/geo_localizer.py to geo_localizer.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/final_approach.py to final_approach.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/weave_planner.py to weave_planner.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/waypoint_provider.py to waypoint_provider.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/local_planner.py to local_planner.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/gap_planner.py to gap_planner.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/__init__.py to __init__.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/navigation/obstacle_guard.py to obstacle_guard.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/mission_events.py to mission_events.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/mission_controller.py to mission_controller.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/journey_logger.py to journey_logger.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/summary_generator.py to summary_generator.cpython-312.pyc
+running install_data
+copying launch/navigation.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+copying launch/mission.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+copying launch/teleop.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+copying launch/perception.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+copying config/lidar.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/waypoints.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/mission.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/camera.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+running install_egg_info
+removing '/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info' (and everything under it)
+Copying build/auto_nav/auto_nav.egg-info to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info
+running install_scripts
+Installing cmd_gate script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing cone_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing distance_estimator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing gamepad_watchdog script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing gap_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing home_pose_recorder script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing journey_logger script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing joy_mapper script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing local_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing mission_controller script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing mode_manager script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing object_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing obstacle_guard script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing path_follower script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing photo_capture script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing summary_generator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing weave_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+writing list of installed files to '/home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log'

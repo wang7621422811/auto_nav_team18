@@ -1,0 +1,24 @@
+# waypoints_data.yaml — plain YAML waypoint list (NOT a ROS2 params file).
+#
+# Read at runtime by WaypointProvider (and WeavePlanner) via the
+# 'waypoints_file' ROS2 parameter.
+#
+# Coordinate formats per entry:
+#   type: xy   →  x: <metres>,  y: <metres>    (local odom / ENU frame)
+#   type: gps  →  lat: <degrees>, lon: <degrees>  (requires 'origin' block below)
+#
+# Uncomment and fill 'origin' if any waypoint uses type: gps.
+# origin:
+#   lat: 51.4788   # decimal degrees
+#   lon: -0.0106
+
+waypoints:
+  - name: wp1
+    type: xy
+    x: 8.0
+    y: 0.0
+
+  - name: wp2
+    type: xy
+    x: 8.0
+    y: 8.0

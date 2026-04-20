@@ -21,11 +21,15 @@ class GamepadWatchdogNode(Node):
 
         # Parameters from joystick.yaml (all have safe defaults)
         self.declare_parameter('axis_deadman', 5)
+        self.declare_parameter('deadman_button', -1)
         self.declare_parameter('deadman_threshold', 0.5)
         self.declare_parameter('joy_timeout_sec', 1.0)
 
         self._axis_deadman: int = (
             self.get_parameter('axis_deadman').get_parameter_value().integer_value
+        )
+        self._deadman_button: int = (
+            self.get_parameter('deadman_button').get_parameter_value().integer_value
         )
         self._deadman_threshold: float = (
             self.get_parameter('deadman_threshold').get_parameter_value().double_value
@@ -54,10 +58,14 @@ class GamepadWatchdogNode(Node):
         timer_period = max(0.1, self._timeout / 2.0)
         self._timer = self.create_timer(timer_period, self._watchdog_tick)
 
+        dm_info = (
+            f'deadman_button={self._deadman_button}'
+            if self._deadman_button >= 0
+            else f'deadman axis={self._axis_deadman}'
+        )
         self.get_logger().info(
             f'GamepadWatchdog ready — timeout={self._timeout}s, '
-            f'deadman axis={self._axis_deadman}, '
-            f'threshold={self._deadman_threshold}'
+            f'{dm_info}, threshold={self._deadman_threshold}'
         )
 
     # ------------------------------------------------------------------
@@ -68,9 +76,13 @@ class GamepadWatchdogNode(Node):
             self._connected = True
             self.get_logger().info('Joystick CONNECTED')
 
-        # Evaluate dead-man: trigger axis must exceed threshold
+        # Dead-man: either a trigger axis (e.g. DualShock RT) or a digital button
+        # (e.g. Switch Pro ZR).  When deadman_button >= 0, it takes precedence.
         deadman_active = False
-        if self._axis_deadman < len(msg.axes):
+        if self._deadman_button >= 0:
+            if self._deadman_button < len(msg.buttons):
+                deadman_active = bool(msg.buttons[self._deadman_button])
+        elif 0 <= self._axis_deadman < len(msg.axes):
             deadman_active = msg.axes[self._axis_deadman] > self._deadman_threshold
 
         if deadman_active != self._deadman_ok:

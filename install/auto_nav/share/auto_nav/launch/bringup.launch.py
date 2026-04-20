@@ -82,6 +82,10 @@ def generate_launch_description() -> LaunchDescription:
             'joy_dev', default_value='/dev/input/js0',
             description='Joystick device path',
         ),
+        DeclareLaunchArgument(
+            'gamepad', default_value='ps4',
+            description='Gamepad profile: ps4 | switch_pro',
+        ),
     ]
 
     # Convenience references
@@ -166,20 +170,8 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ---- 4. Joy (Bluetooth gamepad) ----------------------------------------
-    joy_node = Node(
-        package='joy',
-        executable='joy_node',
-        name='joy',
-        output='screen',
-        parameters=[
-            _cfg('joystick.yaml'),
-            {
-                'dev': joy_dev,
-                'use_sim_time': use_sim_time,
-            },
-        ],
-    )
+    # ---- 4. Joy + Gamepad watchdog (profile resolved via OpaqueFunction) ------
+    # Actual node creation happens in _gamepad_nodes() below.
 
     # ---- 5. Static TF publishers -------------------------------------------
     # base_link → laser
@@ -208,18 +200,6 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # ---- 6. Gamepad watchdog -----------------------------------------------
-    watchdog_node = Node(
-        package='auto_nav',
-        executable='gamepad_watchdog',
-        name='gamepad_watchdog',
-        output='screen',
-        parameters=[
-            _cfg('joystick.yaml'),
-            {'use_sim_time': use_sim_time},
-        ],
-    )
-
     # ---- 7. Home pose recorder ---------------------------------------------
     home_pose_node = Node(
         package='auto_nav',
@@ -232,7 +212,7 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ---- Assemble with lidar selected via OpaqueFunction ------------------
+    # ---- Assemble with lidar + gamepad resolved via OpaqueFunction ---------
     def _lidar_nodes(context, *args, **kwargs):
         """Select LiDAR driver at launch time — avoids IfCondition string hack."""
         lt = context.launch_configurations.get('lidar_type', 'sick').strip().lower()
@@ -243,16 +223,50 @@ def generate_launch_description() -> LaunchDescription:
             LogInfo(msg='[bringup] Starting SICK LiDAR driver (sick_scan_xd)').execute(context)
             return [sick_node]
 
+    def _gamepad_nodes(context, *args, **kwargs):
+        """Resolve gamepad profile and create joy + watchdog nodes."""
+        gamepad      = context.launch_configurations.get('gamepad', 'ps4')
+        joy_dev      = context.launch_configurations.get('joy_dev', '/dev/input/js0')
+        use_sim_time = context.launch_configurations.get('use_sim_time', 'false')
+        sim_params   = {'use_sim_time': use_sim_time == 'true'}
+
+        cfg = os.path.join(
+            get_package_share_directory('auto_nav'),
+            'config', 'gamepad', f'{gamepad}.yaml',
+        )
+        if not os.path.isfile(cfg):
+            raise FileNotFoundError(
+                f"[bringup] Unknown gamepad profile '{gamepad}'. "
+                f"Expected: {cfg}. Available: ps4, switch_pro"
+            )
+
+        LogInfo(msg=f'[bringup] gamepad profile: {gamepad}').execute(context)
+
+        joy_node = Node(
+            package='joy',
+            executable='joy_node',
+            name='joy',
+            output='screen',
+            parameters=[cfg, {'dev': joy_dev, **sim_params}],
+        )
+        watchdog_node = Node(
+            package='auto_nav',
+            executable='gamepad_watchdog',
+            name='gamepad_watchdog',
+            output='screen',
+            parameters=[cfg, sim_params],
+        )
+        return [joy_node, watchdog_node]
+
     ld = LaunchDescription(
         args + [
             LogInfo(msg='=== auto_nav bringup: Step 0 ==='),
             aria_node,
             OpaqueFunction(function=_lidar_nodes),
             camera_node,
-            joy_node,
+            OpaqueFunction(function=_gamepad_nodes),
             tf_base_to_laser,
             tf_base_to_camera,
-            watchdog_node,
             home_pose_node,
         ]
     )

@@ -236,9 +236,16 @@ def _make_follower(wp_file: str, **param_overrides) -> PathFollowerNode:
     node._target_x      = 0.0
     node._target_y      = 0.0
 
-    node._pub_cmd    = MagicMock()
-    node._pub_wp     = MagicMock()
-    node._pub_status = MagicMock()
+    node._pub_cmd     = MagicMock()
+    node._pub_wp      = MagicMock()
+    node._pub_status  = MagicMock()
+    node._pub_segment = MagicMock()  # added by Step 3 (/navigation/segment)
+
+    # Step 3 state variables
+    node._local_target_time    = 0.0    # timestamp of last /local_target (0 = never)
+    node._local_target_timeout = 0.5    # seconds before local target goes stale
+    node._pending_advance      = False  # flag set when waypoint complete, cleared on deadman
+    node._mission_hold         = False  # deadman-hold flag (Step 3)
 
     logger = MagicMock()
     node._logger = logger

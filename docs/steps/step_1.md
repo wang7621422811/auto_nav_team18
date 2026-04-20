@@ -54,3 +54,15 @@ else:
 自动模式不按 dead-man l,r绝对不能动
 松开 dead-man 200ms 内停车
 手柄断连立即停车
+
+---
+```
+# PS4（默认，不加参数也是 ps4）
+ros2 launch auto_nav teleop.launch.py gamepad:=ps4
+
+# Switch Pro
+ros2 launch auto_nav teleop.launch.py gamepad:=switch_pro
+
+# bringup 同样支持
+ros2 launch auto_nav bringup.launch.py gamepad:=switch_pro
+```

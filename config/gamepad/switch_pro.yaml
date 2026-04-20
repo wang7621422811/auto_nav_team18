@@ -1,0 +1,55 @@
+# ============================================================
+# Profile: Nintendo Switch Pro (hid-nintendo / Linux joy driver)
+# ============================================================
+# Switch profile with:  ros2 launch auto_nav teleop.launch.py gamepad:=switch_pro
+#
+# Physical layout (sensor_msgs/Joy indices, 0-based):
+#   axes[0]  Left stick X              axes[3]  Right stick X (→ turn)
+#   axes[1]  Left stick Y (↑ forward)  axes[4]  Right stick Y
+#   axes[2]  ...                       buttons[0]  B
+#   (ZL/ZR appear as BUTTONS, not analog axes on this driver)
+#                                      buttons[1]  A
+#                                      buttons[2]  Y
+#                                      buttons[3]  X
+#                                      buttons[6]  ZL   ← deadman option
+#                                      buttons[7]  ZR   ← deadman (default)
+#
+# Always verify with:  ros2 topic echo /joy
+# (press ZR and watch which buttons[] entry flips to 1)
+# ============================================================
+
+/joy:
+  ros__parameters:
+    deadzone: 0.15         # Switch Pro sticks typically need less deadzone
+    autorepeat_rate: 20.0
+    sticky_buttons: false
+    coalesce_interval_ms: 1
+
+/teleop_twist_joy:
+  ros__parameters:
+    axis_linear:
+      x: 1                 # Left stick Y → forward / back
+    axis_angular:
+      yaw: 2               # Right stick X → turn  (differs from PS4!)
+    scale_linear:
+      x: 0.5
+    scale_angular:
+      yaw: 1.0
+    require_enable_button: false
+
+/gamepad_watchdog:
+  ros__parameters:
+    axis_deadman: -1       # ZR is a digital button, not an analog axis
+    deadman_button: 7      # ZR (BTN_TR2) — change to 6 for ZL if preferred
+    deadman_threshold: 0.5 # unused when deadman_button >= 0
+    joy_timeout_sec: 1.0
+
+/joy_mapper:
+  ros__parameters:
+    btn_auto_mode: 0       # B → enable AUTO
+    btn_manual_mode: 1     # A → enable MANUAL
+    btn_emergency_stop: 3  # X → E-stop  (verify: press X, check buttons[3] in /joy)
+
+/cmd_gate:
+  ros__parameters:
+    gate_rate_hz: 10.0

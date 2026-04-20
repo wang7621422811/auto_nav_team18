@@ -18,6 +18,24 @@ setup(
         # Install all config files
         (os.path.join('share', package_name, 'config'),
          glob('config/*.yaml')),
+        # Install per-gamepad profiles (config/gamepad/<profile>.yaml)
+        (os.path.join('share', package_name, 'config', 'gamepad'),
+         glob('config/gamepad/*.yaml')),
+        # ── Simulation assets ────────────────────────────────────────────────
+        # launch + bridge config
+        (os.path.join('share', package_name, 'simulation', 'sim_bringup'),
+         glob('auto_nav/simulation/sim_bringup/*.py')
+         + glob('auto_nav/simulation/sim_bringup/*.yaml')),
+        # URDF
+        (os.path.join('share', package_name, 'simulation', 'sim_robot_description'),
+         glob('auto_nav/simulation/sim_robot_description/*.urdf')),
+        # World files
+        (os.path.join('share', package_name, 'simulation', 'sim_worlds'),
+         glob('auto_nav/simulation/sim_worlds/*.world')),
+        # Meshes (.dae and .stl) — required for package:// URI resolution
+        (os.path.join('share', package_name, 'simulation', 'meshes'),
+         glob('auto_nav/simulation/meshes/*.dae')
+         + glob('auto_nav/simulation/meshes/*.stl')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -48,6 +66,8 @@ setup(
             'mission_controller = auto_nav.mission.mission_controller:main',
             'journey_logger     = auto_nav.mission.journey_logger:main',
             'summary_generator  = auto_nav.mission.summary_generator:main',
+            # Simulation helpers
+            'sim_init           = auto_nav.simulation.sim_bringup.sim_init_node:main',
         ],
     },
 )

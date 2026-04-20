@@ -1,0 +1,74 @@
+[0.485s] Invoking command in '/home/parallels/workspace/auto_nav_team18': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/parallels/workspace/auto_nav_team18/build/auto_nav/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_nav build --build-base /home/parallels/workspace/auto_nav_team18/build/auto_nav/build install --record /home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log --single-version-externally-managed install_data
+[0.641s] running egg_info
+[0.652s] writing build/auto_nav/auto_nav.egg-info/PKG-INFO
+[0.652s] writing dependency_links to build/auto_nav/auto_nav.egg-info/dependency_links.txt
+[0.652s] writing entry points to build/auto_nav/auto_nav.egg-info/entry_points.txt
+[0.652s] writing requirements to build/auto_nav/auto_nav.egg-info/requires.txt
+[0.652s] writing top-level names to build/auto_nav/auto_nav.egg-info/top_level.txt
+[0.673s] reading manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+[0.674s] writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+[0.674s] running build
+[0.675s] running build_py
+[0.675s] running install
+[0.680s] running install_lib
+[0.692s] running install_data
+[0.692s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation
+[0.692s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup
+[0.692s] copying auto_nav/simulation/sim_bringup/sim_init_node.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup
+[0.692s] copying auto_nav/simulation/sim_bringup/sim_bringup.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup
+[0.692s] copying auto_nav/simulation/sim_bringup/bridge.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup
+[0.692s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_robot_description
+[0.692s] copying auto_nav/simulation/sim_robot_description/pioneer.urdf -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_robot_description
+[0.692s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_worlds
+[0.692s] copying auto_nav/simulation/sim_worlds/pioneer3at_slalom.world -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_worlds
+[0.692s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.693s] copying auto_nav/simulation/meshes/suporte_base_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.693s] copying auto_nav/simulation/meshes/axle.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.693s] copying auto_nav/simulation/meshes/kinect.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.694s] copying auto_nav/simulation/meshes/left_hubcap.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.694s] copying auto_nav/simulation/meshes/tampa4_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.694s] copying auto_nav/simulation/meshes/tampa2_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.694s] copying auto_nav/simulation/meshes/back_sonar.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.694s] copying auto_nav/simulation/meshes/left_hubcap_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.694s] copying auto_nav/simulation/meshes/right_hubcap.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.695s] copying auto_nav/simulation/meshes/arm_control_box_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.695s] copying auto_nav/simulation/meshes/suporte_armControl_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.695s] copying auto_nav/simulation/meshes/wheel.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.695s] copying auto_nav/simulation/meshes/suporte_kinect_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.695s] copying auto_nav/simulation/meshes/chassis.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.695s] copying auto_nav/simulation/meshes/suporte_base_mesh2.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/suporte_monitor_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/suporte_depth_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/hokuyo1.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/tampa1_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/back_sonar_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/hokuyo.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/front_sonar.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/top.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.696s] copying auto_nav/simulation/meshes/tv_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.697s] copying auto_nav/simulation/meshes/tampa3_mesh.dae -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.697s] copying auto_nav/simulation/meshes/hokuyo_convex.stl -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes
+[0.697s] running install_egg_info
+[0.707s] removing '/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info' (and everything under it)
+[0.707s] Copying build/auto_nav/auto_nav.egg-info to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info
+[0.708s] running install_scripts
+[0.785s] Installing cmd_gate script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing cone_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing distance_estimator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing gamepad_watchdog script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing gap_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing home_pose_recorder script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing journey_logger script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing joy_mapper script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing local_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing mission_controller script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing mode_manager script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.785s] Installing object_detector script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.786s] Installing obstacle_guard script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.786s] Installing path_follower script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.786s] Installing photo_capture script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.786s] Installing sim_init script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.786s] Installing summary_generator script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.786s] Installing weave_planner script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.787s] writing list of installed files to '/home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log'
+[0.807s] Invoked command in '/home/parallels/workspace/auto_nav_team18' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/parallels/workspace/auto_nav_team18/build/auto_nav/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_nav build --build-base /home/parallels/workspace/auto_nav_team18/build/auto_nav/build install --record /home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log --single-version-externally-managed install_data
