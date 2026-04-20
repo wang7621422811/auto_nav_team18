@@ -1,10 +1,11 @@
 # Pioneer 3-AT chassis parameters.
 # All motion limits enforced by the safety gate (cmd_gate_node), not the driver.
 
-robot:
+/**:
   ros__parameters:
     # ------- Serial / connection -------
     # Serial port inside Docker container — remap via real.yaml if needed.
+    # Wildcard namespace ensures params apply regardless of node name.
     serial_port: "/dev/ttyUSB0"
     serial_baud: 9600
 
@@ -16,7 +17,19 @@ robot:
     odom_frame: "odom"
     base_frame: "base_link"
 
-    # ------- TF static offsets (metres, applied in bringup static_tf) -------
+    # ------- TF static offsets (metres, read by bringup static_transform_publisher) -------
+    # Convention: REP-103 base_link — x forward, y left, z up (metres).
+    # Physical measurement:
+    #   1) Confirm base_link origin with your stack (ariaNode / URDF): often geometric
+    #      centre on the ground plane between the driven wheels; x points forward.
+    #   2) Pick a reference on each sensor (LiDAR: scanner centre per SICK drawing;
+    #      camera: lens/optical centre aligned with depthai ``camera_link``).
+    #   3) From the base_link origin, measure along +x/+y/+z to that sensor point
+    #      (tape/caliper/depth gauge). Enter the result below (no extra sign flip).
+    #   4) bringup.launch.py loads these values at launch — no duplicate numbers in launch.
+    # Testing: ros2 launch … bringup → ``ros2 run tf2_ros tf2_echo base_link laser``
+    #   and ``tf2_echo base_link camera_link``; in RViz2 show TF and visually align
+    #   scan/image with the robot body; small errors show as consistent offset in fusion.
     # base_link → laser (forward-mounted LiDAR)
     laser_x: 0.20
     laser_y: 0.00

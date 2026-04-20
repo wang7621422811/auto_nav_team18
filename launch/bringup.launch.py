@@ -2,39 +2,44 @@
 bringup.launch.py — Step 0: bring all hardware alive.
 
 Launches (in order of dependency):
-  1. ros2aria         — Pioneer 3-AT chassis driver  → /odom /cmd_vel
+  1. ariaNode         — Pioneer 3-AT chassis driver  → /odom /cmd_vel
   2. sick_scan_xd OR lakibeam_ros2 — LiDAR driver    → /scan
-  3. depthai_ros_driver             — OAK-D V2 camera → /camera/*
+  3. depthai_ros_driver             — OAK-D V2 camera → /camera/*   (optional)
   4. joy_node                       — Bluetooth gamepad → /joy
-  5. static_transform_publisher ×2  — odom→base_link already from aria;
-                                       base_link→laser, base_link→camera_link
+  5. static_transform_publisher ×2  — base_link→laser, base_link→camera_link
+     (translation xyz read from config/robot.yaml at launch)
   6. gamepad_watchdog               — /joy_connected /deadman_ok
-  7. home_pose_recorder             — /mission/home_pose, saves YAML
+
+NOT here (belongs in navigation.launch.py):
+  home_pose_recorder  — moved to avoid duplicate when navigation.launch.py runs
 
 CLI arguments (all have defaults; override on command line):
   lidar_type:=sick | lakibeam
   serial_port:=/dev/ttyUSB0
   sick_ip:=192.168.0.1
   lakibeam_ip:=192.168.1.200
+  use_camera:=true | false  (false skips depthai_ros_driver; safe when camera not available)
   camera_mx_id:=          (empty = auto)
   use_sim_time:=false
+  aria_pkg:=ariaNode
+  aria_exec:=ariaNode     (confirmed via `ros2 pkg executables ariaNode` on pioneer1)
 """
 
 import os
 
+from auto_nav.robot_extrinsics import (
+    load_sensor_xyz_from_robot_yaml,
+    static_transform_arguments,
+)
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    GroupAction,
-    IncludeLaunchDescription,
     LogInfo,
     OpaqueFunction,
 )
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +91,20 @@ def generate_launch_description() -> LaunchDescription:
             'gamepad', default_value='ps4',
             description='Gamepad profile: ps4 | switch_pro',
         ),
+        DeclareLaunchArgument(
+            'aria_pkg',
+            default_value='ariaNode',
+            description='ROS 2 package name for Pioneer chassis (course stack)',
+        ),
+        DeclareLaunchArgument(
+            'aria_exec',
+            default_value='ariaNode',
+            description='Executable inside aria_pkg; override if different on this machine',
+        ),
+        DeclareLaunchArgument(
+            'use_camera', default_value='true',
+            description='Launch OAK-D camera driver (set false if depthai_ros_driver not installed)',
+        ),
     ]
 
     # Convenience references
@@ -96,24 +115,33 @@ def generate_launch_description() -> LaunchDescription:
     camera_mx_id = LaunchConfiguration('camera_mx_id')
     use_sim_time = LaunchConfiguration('use_sim_time')
     joy_dev      = LaunchConfiguration('joy_dev')
+    aria_pkg     = LaunchConfiguration('aria_pkg')
+    aria_exec    = LaunchConfiguration('aria_exec')
 
-    # ---- 1. Pioneer chassis (ros2aria) ------------------------------------
+    # ---- 1. Pioneer chassis (ariaNode / configurable) --------------------
+    # Doc CLI: ros2 run ariaNode ariaNode --rp /dev/ttyUSB0
+    # "--rp" is a direct executable arg for the serial port.
+    # ROS2 params (serial_port / port) are also passed via robot.yaml in case
+    # the node reads them; actual param names confirmed via `ros2 param list`.
     aria_node = Node(
-        package='ros2aria',
-        executable='ros2aria',
+        package=aria_pkg,
+        executable=aria_exec,
         name='aria_node',
         output='screen',
+        arguments=['--rp', serial_port],
         parameters=[
             _cfg('robot.yaml'),
             {
-                'port': serial_port,
+                'serial_port': serial_port,
+                'port': serial_port,          # alias — whichever name ariaNode uses
                 'use_sim_time': use_sim_time,
             },
         ],
         remappings=[
-            # ros2aria publishes to /RosAria/pose — remap to standard /odom
-            ('/RosAria/pose', '/odom'),
-            ('/RosAria/cmd_vel', '/cmd_vel_safe'),
+            # ariaNode uses standard names: subscribes /cmd_vel, publishes /odom.
+            # Remap its /cmd_vel input to /cmd_vel_safe so only the safety gate
+            # (cmd_gate_node) can drive the chassis.
+            ('/cmd_vel', '/cmd_vel_safe'),
         ],
     )
 
@@ -151,68 +179,51 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ---- 3. OAK-D V2 camera (depthai_ros_driver) --------------------------
-    camera_node = Node(
-        package='depthai_ros_driver',
-        executable='camera_node',
-        name='camera',
-        output='screen',
-        parameters=[
-            _cfg('camera.yaml'),
-            {
-                'i_mx_id': camera_mx_id,
-                'use_sim_time': use_sim_time,
-            },
-        ],
-        remappings=[
-            ('~/color/image', '/camera/color/image_raw'),
-            ('~/depth/image', '/camera/depth/image_raw'),
-        ],
-    )
+    # ---- 3. OAK-D V2 camera (depthai_ros_driver) — optional -----------------
+    # Created inside OpaqueFunction _camera_nodes() so the package lookup only
+    # happens when use_camera:=true, avoiding "package not found" on machines
+    # that don't have depthai_ros_driver installed.
 
     # ---- 4. Joy + Gamepad watchdog (profile resolved via OpaqueFunction) ------
     # Actual node creation happens in _gamepad_nodes() below.
 
-    # ---- 5. Static TF publishers -------------------------------------------
-    # base_link → laser
-    tf_base_to_laser = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='tf_base_to_laser',
-        arguments=[
-            '0.20', '0.00', '0.18',   # x y z (metres) — matches robot.yaml
-            '0',    '0',    '0',       # roll pitch yaw (radians)
-            'base_link', 'laser',
-        ],
-        parameters=[{'use_sim_time': use_sim_time}],
-    )
+    # ---- 5. Static TF publishers (xyz from config/robot.yaml) ------------
+    def _sensor_static_tf(context, *args, **kwargs):
+        """Publish base_link→laser and base_link→camera_link from robot.yaml."""
+        cfg_path = _cfg('robot.yaml')
+        try:
+            ex = load_sensor_xyz_from_robot_yaml(cfg_path)
+        except (OSError, ValueError) as e:
+            raise RuntimeError(
+                f'[bringup] Failed to read laser/camera XYZ from {cfg_path}: {e}'
+            ) from e
 
-    # base_link → camera_link
-    tf_base_to_camera = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='tf_base_to_camera',
-        arguments=[
-            '0.25', '0.00', '0.22',
-            '0',    '0',    '0',
-            'base_link', 'camera_link',
-        ],
-        parameters=[{'use_sim_time': use_sim_time}],
-    )
+        use_sim = context.launch_configurations.get('use_sim_time', 'false')
+        sim_params = {'use_sim_time': use_sim == 'true'}
 
-    # ---- 7. Home pose recorder ---------------------------------------------
-    home_pose_node = Node(
-        package='auto_nav',
-        executable='home_pose_recorder',
-        name='home_pose_recorder',
-        output='screen',
-        parameters=[
-            _cfg('mission.yaml'),
-            {'use_sim_time': use_sim_time},
-        ],
-    )
+        laser_args = static_transform_arguments(ex['laser'], child='laser')
+        cam_args = static_transform_arguments(ex['camera'], child='camera_link')
+
+        return [
+            Node(
+                package='tf2_ros',
+                executable='static_transform_publisher',
+                name='tf_base_to_laser',
+                arguments=laser_args,
+                parameters=[sim_params],
+            ),
+            Node(
+                package='tf2_ros',
+                executable='static_transform_publisher',
+                name='tf_base_to_camera',
+                arguments=cam_args,
+                parameters=[sim_params],
+            ),
+        ]
 
     # ---- Assemble with lidar + gamepad resolved via OpaqueFunction ---------
+    # home_pose_recorder is intentionally NOT here — it lives in navigation.launch.py
+    # to avoid duplicate nodes when both launch files run together.
     def _lidar_nodes(context, *args, **kwargs):
         """Select LiDAR driver at launch time — avoids IfCondition string hack."""
         lt = context.launch_configurations.get('lidar_type', 'sick').strip().lower()
@@ -222,6 +233,34 @@ def generate_launch_description() -> LaunchDescription:
         else:
             LogInfo(msg='[bringup] Starting SICK LiDAR driver (sick_scan_xd)').execute(context)
             return [sick_node]
+
+    def _camera_nodes(context, *args, **kwargs):
+        """Only launch camera driver when use_camera:=true."""
+        if context.launch_configurations.get('use_camera', 'true').lower() != 'true':
+            LogInfo(msg='[bringup] Camera disabled (use_camera:=false)').execute(context)
+            return []
+        LogInfo(msg='[bringup] Starting OAK-D camera driver').execute(context)
+        cam_mx_id    = context.launch_configurations.get('camera_mx_id', '')
+        use_sim_time = context.launch_configurations.get('use_sim_time', 'false')
+        return [
+            Node(
+                package='depthai_ros_driver',
+                executable='camera_node',
+                name='camera',
+                output='screen',
+                parameters=[
+                    _cfg('camera.yaml'),
+                    {
+                        'i_mx_id': cam_mx_id,
+                        'use_sim_time': use_sim_time == 'true',
+                    },
+                ],
+                remappings=[
+                    ('~/color/image', '/camera/color/image_raw'),
+                    ('~/depth/image', '/camera/depth/image_raw'),
+                ],
+            )
+        ]
 
     def _gamepad_nodes(context, *args, **kwargs):
         """Resolve gamepad profile and create joy + watchdog nodes."""
@@ -263,11 +302,9 @@ def generate_launch_description() -> LaunchDescription:
             LogInfo(msg='=== auto_nav bringup: Step 0 ==='),
             aria_node,
             OpaqueFunction(function=_lidar_nodes),
-            camera_node,
+            OpaqueFunction(function=_camera_nodes),
             OpaqueFunction(function=_gamepad_nodes),
-            tf_base_to_laser,
-            tf_base_to_camera,
-            home_pose_node,
+            OpaqueFunction(function=_sensor_static_tf),
         ]
     )
 

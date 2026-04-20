@@ -25,7 +25,7 @@
   <!-- Reused external packages -->
   <exec_depend>joy</exec_depend>             <!-- joystick driver -->
   <exec_depend>teleop_twist_joy</exec_depend><!-- manual drive, wrapped by safety gate -->
-  <exec_depend>ros2aria</exec_depend>        <!-- Pioneer chassis driver -->
+  <exec_depend>ariaNode</exec_depend>        <!-- Pioneer chassis driver (course stack) -->
   <exec_depend>depthai_ros_driver</exec_depend> <!-- OAK-D V2 camera -->
   <!-- sick_scan_xd / lakibeam driver selected at launch time via arg -->
 
