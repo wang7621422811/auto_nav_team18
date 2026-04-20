@@ -1,0 +1,22 @@
+# Real-hardware deployment overrides.
+# Values here shadow the defaults in robot.yaml / lidar.yaml / camera.yaml.
+# This file is the ONLY place to change hardware-specific paths and IPs.
+
+# --- Chassis ---
+robot:
+  ros__parameters:
+    serial_port: "/dev/ttyUSB0"   # verify with: ls /dev/ttyUSB*
+
+# --- LiDAR ---
+lidar:
+  ros__parameters:
+    lidar_type: "sick"            # "sick" | "lakibeam"
+    sick:
+      hostname: "192.168.0.1"    # SICK scanner IP (check label on device)
+    lakibeam:
+      hostname: "192.168.1.200"  # Lakibeam IP (check label on device)
+
+# --- Camera ---
+camera:
+  ros__parameters:
+    mx_id: ""                     # leave empty for auto-detect, or set MX ID

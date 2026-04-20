@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: auto-nav
+Version: 0.1.0
+Summary: Autonomous navigation for Pioneer 3-AT — Step 0 bringup
+Maintainer: team18
+Maintainer-email: team18@example.com
+License: MIT

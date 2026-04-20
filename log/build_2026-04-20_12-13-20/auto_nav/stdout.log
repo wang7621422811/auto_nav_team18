@@ -1,0 +1,59 @@
+running egg_info
+creating build/auto_nav/auto_nav.egg-info
+writing build/auto_nav/auto_nav.egg-info/PKG-INFO
+writing dependency_links to build/auto_nav/auto_nav.egg-info/dependency_links.txt
+writing entry points to build/auto_nav/auto_nav.egg-info/entry_points.txt
+writing requirements to build/auto_nav/auto_nav.egg-info/requires.txt
+writing top-level names to build/auto_nav/auto_nav.egg-info/top_level.txt
+writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+reading manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build
+creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib
+creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav
+copying auto_nav/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav
+creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+copying auto_nav/teleop/gamepad_watchdog_node.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+copying auto_nav/teleop/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+copying auto_nav/mission/home_pose_recorder.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+copying auto_nav/mission/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+running install
+running install_lib
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop/gamepad_watchdog_node.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/home_pose_recorder.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/gamepad_watchdog_node.py to gamepad_watchdog_node.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/__init__.py to __init__.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/home_pose_recorder.py to home_pose_recorder.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/__init__.py to __init__.cpython-312.pyc
+byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/__init__.py to __init__.cpython-312.pyc
+running install_data
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index/resource_index
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index/resource_index/packages
+copying resource/auto_nav -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index/resource_index/packages
+copying package.xml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+copying launch/bringup.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+copying launch/teleop.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/real.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/joystick.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/robot.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/lidar.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/mission.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+copying config/camera.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+running install_egg_info
+Copying build/auto_nav/auto_nav.egg-info to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info
+running install_scripts
+Installing gamepad_watchdog script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+Installing home_pose_recorder script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+writing list of installed files to '/home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log'

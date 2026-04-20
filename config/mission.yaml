@@ -1,0 +1,37 @@
+# Mission-level parameters (Step 5 — mission state machine).
+
+# ── home_pose_recorder ──────────────────────────────────────────────────────
+home_pose_recorder:
+  ros__parameters:
+    home_pose_file: "artifacts/logs/home_pose.yaml"
+
+# ── mission_controller ──────────────────────────────────────────────────────
+mission_controller:
+  ros__parameters:
+    # Seconds in CAPTURE_MARKER before starting SEARCH_OBJECT
+    search_trigger_s: 1.0
+    # Total time budget for one search sweep
+    search_sweep_duration_s: 6.0
+    # Interval between yaw-direction flips during sweep
+    search_sweep_step_s: 1.5
+    # Angular speed during sweep (rad/s)
+    search_sweep_yaw: 0.3
+    # Hold time before transitioning from CAPTURE_MARKER → SEARCH_OBJECT
+    capture_hold_s: 1.0
+    # Max age of a cached /object/detection message (s)
+    object_cache_timeout_s: 5.0
+    # FSM update frequency (Hz)
+    tick_rate_hz: 10.0
+
+# ── journey_logger ───────────────────────────────────────────────────────────
+journey_logger:
+  ros__parameters:
+    log_dir: "artifacts/logs"
+    log_filename: "journey.jsonl"
+
+# ── summary_generator ────────────────────────────────────────────────────────
+summary_generator:
+  ros__parameters:
+    log_dir: "artifacts/logs"
+    log_filename: "journey.jsonl"
+    summary_dir: "artifacts/summaries"

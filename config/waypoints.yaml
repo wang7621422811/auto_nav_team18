@@ -1,0 +1,63 @@
+# =============================================================================
+# waypoints.yaml
+#
+# Dual-purpose file:
+#   1. ROS2 parameter section (path_follower.ros__parameters) — read by ROS2 at launch
+#   2. Waypoint data section  (waypoints: / origin:)          — read by WaypointProvider
+#
+# The 'waypoints_file' parameter must be set to the absolute path of THIS file
+# by the launch script (navigation.launch.py does this automatically via
+# FindPackageShare).
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# ROS2 node parameters for PathFollowerNode
+# ---------------------------------------------------------------------------
+path_follower:
+  ros__parameters:
+    # Absolute path to this file — overridden by navigation.launch.py at startup
+    waypoints_file: ""
+
+    # Arrival thresholds
+    coarse_arrival_radius_m: 2.5   # switch to "waiting for marker" within this radius
+    final_arrival_radius_m:  1.0   # waypoint considered complete within this radius
+    home_arrival_radius_m:   1.0   # home considered reached within this radius
+
+    # Final-approach geometry: lateral offset so marker stays on the right
+    pass_offset_m: 0.8
+
+    # Velocity limits (must not exceed robot.yaml safety-gate limits)
+    max_linear_vel:  0.4   # m/s
+    max_angular_vel: 1.0   # rad/s
+
+    # Proportional controller gains
+    k_angular: 1.5   # angular velocity = k_angular * heading_error
+    k_linear:  0.4   # linear  velocity = k_linear  * distance  (reduced by cos²)
+
+    # Control loop rate
+    control_rate_hz: 10.0
+
+# ---------------------------------------------------------------------------
+# Waypoint data — read by WaypointProvider (not a ROS param section)
+#
+# Each entry supports two coordinate types:
+#   type: xy   →  x: <metres>,  y: <metres>   (local odom / ENU frame)
+#   type: gps  →  lat: <degrees>, lon: <degrees>  (requires 'origin' below)
+#
+# If using GPS waypoints, uncomment and fill in 'origin'.
+# ---------------------------------------------------------------------------
+
+# origin:
+#   lat: 51.4788   # degrees — GPS origin for ENU conversion
+#   lon: -0.0106
+
+waypoints:
+  - name: wp1
+    type: xy
+    x: 8.0
+    y: 0.0
+
+  - name: wp2
+    type: xy
+    x: 8.0
+    y: 8.0

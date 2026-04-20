@@ -1,0 +1,3 @@
+[console_scripts]
+gamepad_watchdog = auto_nav.teleop.gamepad_watchdog_node:main
+home_pose_recorder = auto_nav.mission.home_pose_recorder:main

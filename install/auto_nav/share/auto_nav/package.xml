@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>auto_nav</name>
+  <version>0.1.0</version>
+  <description>
+    Autonomous navigation system for Pioneer 3-AT.
+    Three-layer architecture: safety / navigation / mission.
+    Step 0: hardware bringup (chassis, LiDAR, camera, joystick, odom, tf).
+  </description>
+  <maintainer email="team18@example.com">team18</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Runtime deps we reuse (Rule D) -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+
+  <!-- Reused external packages -->
+  <exec_depend>joy</exec_depend>             <!-- joystick driver -->
+  <exec_depend>teleop_twist_joy</exec_depend><!-- manual drive, wrapped by safety gate -->
+  <exec_depend>ros2aria</exec_depend>        <!-- Pioneer chassis driver -->
+  <exec_depend>depthai_ros_driver</exec_depend> <!-- OAK-D V2 camera -->
+  <!-- sick_scan_xd / lakibeam driver selected at launch time via arg -->
+
+  <!-- Launch -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Test -->
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

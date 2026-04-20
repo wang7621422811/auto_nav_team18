@@ -1,0 +1,32 @@
+# OAK-D V2 camera parameters (depthai_ros_driver).
+# Do not hardcode MX serial numbers — pass via real.yaml or CLI override.
+
+camera:
+  ros__parameters:
+    # ------- Device selection -------
+    # Leave empty string "" to auto-select first available OAK device.
+    mx_id: ""
+
+    # ------- Namespacing -------
+    camera_name: "camera"
+    camera_model: "OAK-D"
+
+    # ------- Color stream -------
+    rgb_fps: 15
+    rgb_width: 1280
+    rgb_height: 720
+
+    # ------- Depth stream -------
+    depth_fps: 15
+
+    # ------- Topics published by driver -------
+    # /camera/color/image_raw
+    # /camera/depth/image_raw
+    # /camera/color/camera_info
+
+    # ------- TF -------
+    base_frame: "base_link"
+    camera_frame: "camera_link"   # optical frame handled internally by driver
+
+    # ------- Photo capture (used by photo_capture node in later steps) -------
+    photo_dir: "artifacts/photos"

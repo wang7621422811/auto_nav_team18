@@ -1,0 +1,76 @@
+# LiDAR driver parameters.
+# Supports SICK (sick_scan_xd) and Lakibeam (lakibeam_ros2).
+# Select driver via bringup.launch.py argument: lidar_type:=sick | lakibeam
+# IPs and frame IDs are NEVER hardcoded in launch files.
+
+lidar:
+  ros__parameters:
+    lidar_type: "sick"           # "sick" | "lakibeam" — overridden by real.yaml
+    scan_topic: "/scan"
+    frame_id: "laser"
+
+    # ------- SICK (sick_scan_xd) -------
+    sick:
+      hostname: "192.168.0.1"   # LiDAR IP — change per deployment
+      port: 2111
+      scanner_type: "sick_lms_5xx"  # e.g. sick_lms_511 / sick_tim_7xx
+      min_ang: -2.356            # rad  (~-135 deg)
+      max_ang:  2.356            # rad  (~+135 deg)
+
+    # ------- Lakibeam (lakibeam_ros2) -------
+    lakibeam:
+      hostname: "192.168.1.200" # Lakibeam default IP — change per deployment
+      port: 2368
+      rpm: 600
+
+    # ------- Common safety threshold -------
+    safety_distance_m: 0.5      # minimum obstacle clearance
+
+# =============================================================================
+# ObstacleGuardNode parameters
+# =============================================================================
+obstacle_guard:
+  ros__parameters:
+    safety_distance_m:  0.5     # emergency stop if obstacle closer than this (m)
+    front_sector_deg:   120.0   # total angular width of front safety zone (deg)
+    whitelist_radius_m: 0.7     # exclusion radius around target cone in FINAL_APPROACH (m)
+    estop_cooldown_s:   0.3     # keep estop=True for this many seconds after trigger
+    guard_rate_hz:      10.0    # watchdog publish rate
+
+# =============================================================================
+# GapPlannerNode parameters
+# =============================================================================
+gap_planner:
+  ros__parameters:
+    gap_min_clearance_m: 0.8    # range below this = obstacle (m)
+    gap_min_width_rad:   0.30   # minimum angular gap width to be passable (rad, ~17°)
+    lookahead_m:         1.5    # local target projection distance (m)
+    w_goal:      3.0            # weight: alignment with waypoint direction
+    w_clearance: 1.5            # weight: gap openness
+    w_progress:  1.0            # weight: forward progress (cos of angle)
+    w_smooth:    0.5            # weight: smoothness penalty vs previous gap angle
+
+# =============================================================================
+# WeavePlannerNode parameters
+# =============================================================================
+weave_planner:
+  ros__parameters:
+    # waypoints_file is injected by navigation.launch.py (same as path_follower)
+    waypoints_file:         ""
+    gap_min_clearance_m:    0.8
+    gap_min_width_rad:      0.30
+    corridor_half_width_m:  2.0   # half-width of the WP0→WP1 corridor (m)
+    lookahead_m:            1.2   # slightly shorter lookahead for tighter manoeuvring
+    w_goal:      3.0
+    w_clearance: 1.5
+    w_progress:  1.0
+    w_smooth:    0.5
+    w_corridor:  5.0              # heavy penalty for leaving the corridor
+
+# =============================================================================
+# LocalPlannerNode parameters
+# =============================================================================
+local_planner:
+  ros__parameters:
+    stale_timeout_s: 0.5    # discard gap/weave target if older than this
+    publish_rate_hz: 10.0

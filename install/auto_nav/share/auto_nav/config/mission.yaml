@@ -1,0 +1,8 @@
+# Mission-level parameters (used by later steps, defined here for completeness).
+
+mission:
+  ros__parameters:
+    waypoint_arrival_radius_m: 1.5   # metres — "close enough" to a waypoint
+    home_pose_file: "artifacts/logs/home_pose.yaml"
+    log_dir: "artifacts/logs"
+    summary_dir: "artifacts/summaries"

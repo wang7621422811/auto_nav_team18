@@ -1,0 +1,31 @@
+# Pioneer 3-AT chassis parameters.
+# All motion limits enforced by the safety gate (cmd_gate_node), not the driver.
+
+robot:
+  ros__parameters:
+    # ------- Serial / connection -------
+    # Serial port inside Docker container — remap via real.yaml if needed.
+    serial_port: "/dev/ttyUSB0"
+    serial_baud: 9600
+
+    # ------- Velocity limits (safety gate enforces these) -------
+    max_linear_vel: 0.5        # m/s  — competition field limit
+    max_angular_vel: 1.0       # rad/s
+
+    # ------- Odometry -------
+    odom_frame: "odom"
+    base_frame: "base_link"
+
+    # ------- TF static offsets (metres, applied in bringup static_tf) -------
+    # base_link → laser (forward-mounted LiDAR)
+    laser_x: 0.20
+    laser_y: 0.00
+    laser_z: 0.18
+
+    # base_link → camera_link (front-centre, slightly elevated)
+    camera_x: 0.25
+    camera_y: 0.00
+    camera_z: 0.22
+
+    # ------- Watchdog / safety -------
+    cmd_vel_timeout_sec: 0.5   # stop if no cmd_vel received within this window

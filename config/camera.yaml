@@ -1,0 +1,90 @@
+# OAK-D V2 camera parameters (depthai_ros_driver).
+# Do not hardcode MX serial numbers — pass via real.yaml or CLI override.
+
+camera:
+  ros__parameters:
+    # ------- Device selection -------
+    # Leave empty string "" to auto-select first available OAK device.
+    mx_id: ""
+
+    # ------- Namespacing -------
+    camera_name: "camera"
+    camera_model: "OAK-D"
+
+    # ------- Color stream -------
+    rgb_fps: 15
+    rgb_width: 1280
+    rgb_height: 720
+
+    # ------- Depth stream -------
+    depth_fps: 15
+
+    # ------- Topics published by driver -------
+    # /camera/color/image_raw
+    # /camera/depth/image_raw
+    # /camera/color/camera_info
+
+    # ------- TF -------
+    base_frame: "base_link"
+    camera_frame: "camera_link"   # optical frame handled internally by driver
+
+    # ------- Photo capture -------
+    photo_dir: "artifacts/photos"
+
+# ---------------------------------------------------------------------------
+# ConeDetectorNode parameters
+# ---------------------------------------------------------------------------
+cone_detector:
+  ros__parameters:
+    # Orange HSV thresholds (OpenCV scale: H 0-179, S/V 0-255)
+    hsv_h_low:        5
+    hsv_h_high:       25
+    hsv_s_low:        120
+    hsv_v_low:        80
+    # Contour area filter (pixels²)
+    min_area_px:      400
+    max_area_px:      80000
+    # Aspect ratio h/w: cones are taller than wide
+    min_aspect_ratio: 0.4
+    max_aspect_ratio: 4.0
+    # Depth sampling window half-size (pixels)
+    depth_roi_px:     5
+    # OAK-D V2 horizontal FOV (degrees)
+    camera_hfov_deg:  69.0
+    image_width:      1280
+    image_height:     720
+
+# ---------------------------------------------------------------------------
+# ObjectDetectorNode parameters
+# ---------------------------------------------------------------------------
+object_detector:
+  ros__parameters:
+    roi_padding_px:    300
+    min_area_px:       300
+    max_area_px:       60000
+    depth_roi_px:      5
+    camera_hfov_deg:   69.0
+    image_width:       1280
+    image_height:      720
+    marker_timeout_s:  2.0
+
+# ---------------------------------------------------------------------------
+# DistanceEstimatorNode parameters
+# OAK-D V2 default intrinsics at 1280x720 (approximate)
+# ---------------------------------------------------------------------------
+distance_estimator:
+  ros__parameters:
+    fx:                  883.0
+    fy:                  883.0
+    cx_principal:        640.0
+    cy_principal:        360.0
+    max_detection_age_s: 1.0
+
+# ---------------------------------------------------------------------------
+# PhotoCaptureNode parameters
+# ---------------------------------------------------------------------------
+photo_capture:
+  ros__parameters:
+    photo_dir:       "artifacts/photos"
+    save_raw_frames: true
+    jpeg_quality:    90

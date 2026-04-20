@@ -1,0 +1,61 @@
+[0.552s] Invoking command in '/home/parallels/workspace/auto_nav_team18': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/parallels/workspace/auto_nav_team18/build/auto_nav/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_nav build --build-base /home/parallels/workspace/auto_nav_team18/build/auto_nav/build install --record /home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log --single-version-externally-managed install_data
+[0.727s] running egg_info
+[0.728s] creating build/auto_nav/auto_nav.egg-info
+[0.739s] writing build/auto_nav/auto_nav.egg-info/PKG-INFO
+[0.740s] writing dependency_links to build/auto_nav/auto_nav.egg-info/dependency_links.txt
+[0.740s] writing entry points to build/auto_nav/auto_nav.egg-info/entry_points.txt
+[0.740s] writing requirements to build/auto_nav/auto_nav.egg-info/requires.txt
+[0.740s] writing top-level names to build/auto_nav/auto_nav.egg-info/top_level.txt
+[0.740s] writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+[0.765s] reading manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+[0.765s] writing manifest file 'build/auto_nav/auto_nav.egg-info/SOURCES.txt'
+[0.765s] running build
+[0.765s] running build_py
+[0.765s] creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build
+[0.766s] creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib
+[0.766s] creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav
+[0.766s] copying auto_nav/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav
+[0.766s] creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+[0.766s] copying auto_nav/teleop/gamepad_watchdog_node.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+[0.766s] copying auto_nav/teleop/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop
+[0.766s] creating /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+[0.766s] copying auto_nav/mission/home_pose_recorder.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+[0.766s] copying auto_nav/mission/__init__.py -> /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission
+[0.766s] running install
+[0.773s] running install_lib
+[0.783s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav
+[0.783s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+[0.785s] copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop/gamepad_watchdog_node.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+[0.785s] copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/teleop/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop
+[0.785s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+[0.785s] copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/home_pose_recorder.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+[0.785s] copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/mission/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission
+[0.785s] copying /home/parallels/workspace/auto_nav_team18/build/auto_nav/build/lib/auto_nav/__init__.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav
+[0.785s] byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/gamepad_watchdog_node.py to gamepad_watchdog_node.cpython-312.pyc
+[0.785s] byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/__init__.py to __init__.cpython-312.pyc
+[0.786s] byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/home_pose_recorder.py to home_pose_recorder.cpython-312.pyc
+[0.786s] byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/__init__.py to __init__.cpython-312.pyc
+[0.786s] byte-compiling /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/__init__.py to __init__.cpython-312.pyc
+[0.786s] running install_data
+[0.786s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index
+[0.786s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index/resource_index
+[0.786s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index/resource_index/packages
+[0.786s] copying resource/auto_nav -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index/resource_index/packages
+[0.786s] copying package.xml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav
+[0.786s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+[0.786s] copying launch/bringup.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+[0.786s] copying launch/teleop.launch.py -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch
+[0.786s] creating /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+[0.786s] copying config/real.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+[0.786s] copying config/joystick.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+[0.787s] copying config/robot.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+[0.787s] copying config/lidar.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+[0.787s] copying config/mission.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+[0.787s] copying config/camera.yaml -> /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config
+[0.787s] running install_egg_info
+[0.800s] Copying build/auto_nav/auto_nav.egg-info to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav-0.1.0-py3.12.egg-info
+[0.801s] running install_scripts
+[0.893s] Installing gamepad_watchdog script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.893s] Installing home_pose_recorder script to /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav
+[0.893s] writing list of installed files to '/home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log'
+[0.922s] Invoked command in '/home/parallels/workspace/auto_nav_team18' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/parallels/workspace/auto_nav_team18/build/auto_nav/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/auto_nav build --build-base /home/parallels/workspace/auto_nav_team18/build/auto_nav/build install --record /home/parallels/workspace/auto_nav_team18/build/auto_nav/install.log --single-version-externally-managed install_data
