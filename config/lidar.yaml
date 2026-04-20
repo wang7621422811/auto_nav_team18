@@ -1,30 +1,23 @@
 # LiDAR driver parameters.
 # Supports SICK (sick_scan_xd) and Lakibeam (lakibeam_ros2).
 # Select driver via bringup.launch.py argument: lidar_type:=sick | lakibeam
-# IPs and frame IDs are NEVER hardcoded in launch files.
+# Driver params must live under the actual node names so ROS2 applies them.
 
-lidar:
+sick_scan:
   ros__parameters:
-    lidar_type: "sick"           # "sick" | "lakibeam" — overridden by real.yaml
-    scan_topic: "/scan"
     frame_id: "laser"
+    hostname: "192.168.0.1"      # LiDAR IP — deployment override lives in real.yaml
+    port: 2111
+    scanner_type: "sick_tim_7xx" # e.g. sick_lms_511 / sick_tim_7xx / sick_lms_1xx
+    min_ang: -2.356              # rad  (~-135 deg)
+    max_ang:  2.356              # rad  (~+135 deg)
 
-    # ------- SICK (sick_scan_xd) -------
-    sick:
-      hostname: "192.168.0.1"   # LiDAR IP — change per deployment
-      port: 2111
-      scanner_type: "sick_lms_5xx"  # e.g. sick_lms_511 / sick_tim_7xx
-      min_ang: -2.356            # rad  (~-135 deg)
-      max_ang:  2.356            # rad  (~+135 deg)
-
-    # ------- Lakibeam (lakibeam_ros2) -------
-    lakibeam:
-      hostname: "192.168.1.200" # Lakibeam default IP — change per deployment
-      port: 2368
-      rpm: 600
-
-    # ------- Common safety threshold -------
-    safety_distance_m: 0.5      # minimum obstacle clearance
+lakibeam_scan:
+  ros__parameters:
+    frame_id: "laser"
+    hostname: "192.168.1.200"    # Lakibeam default IP — deployment override in real.yaml
+    port: 2368
+    rpm: 600
 
 # =============================================================================
 # ObstacleGuardNode parameters

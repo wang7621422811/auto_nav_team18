@@ -65,11 +65,17 @@ Parameters  (path_follower section of config/waypoints.yaml):
   k_linear                  proportional distance gain                 (default 0.4)
   control_rate_hz           control-loop frequency                     (default 10.0)
   local_target_timeout_s    seconds before /local_target is considered stale (default 0.5)
+  require_marker            when false, coarse arrival completes the waypoint
+                            directly for bench / wheel-spin tests     (default true)
+  emit_journey_events       publish key progress events on /journey/event
+                            for JourneyLogger bench runs              (default false)
 """
 
 from __future__ import annotations
 
+import json
 import math
+import time
 from enum import Enum, auto
 
 import rclpy
@@ -79,6 +85,13 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, String
+
+from auto_nav.mission.mission_events import (
+    HOME_REACHED,
+    MISSION_COMPLETE,
+    MISSION_STARTED,
+    WAYPOINT_ARRIVED,
+)
 
 from .waypoint_provider import WaypointProvider
 from .final_approach import FinalApproachController
@@ -118,9 +131,14 @@ class PathFollowerNode(Node):
         self.declare_parameter('k_linear',                0.4)
         self.declare_parameter('control_rate_hz',        10.0)
         self.declare_parameter('local_target_timeout_s',  0.5)
+        self.declare_parameter('require_marker',         True)
+        self.declare_parameter('emit_journey_events',    False)
 
         def _dbl(name: str) -> float:
             return self.get_parameter(name).get_parameter_value().double_value
+
+        def _bool(name: str) -> bool:
+            return self.get_parameter(name).get_parameter_value().bool_value
 
         self._wp_file     = (
             self.get_parameter('waypoints_file').get_parameter_value().string_value
@@ -135,6 +153,8 @@ class PathFollowerNode(Node):
         self._k_lin               = _dbl('k_linear')
         rate_hz                   = _dbl('control_rate_hz')
         self._local_target_timeout = _dbl('local_target_timeout_s')
+        self._require_marker      = _bool('require_marker')
+        self._emit_journey_events = _bool('emit_journey_events')
 
         # ---- Load waypoints ----------------------------------------------
         if not self._wp_file:
@@ -199,6 +219,7 @@ class PathFollowerNode(Node):
         self._pub_wp      = self.create_publisher(PoseStamped, '/waypoint/current',    latched_qos)
         self._pub_status  = self.create_publisher(String,      '/waypoint/status',     latched_qos)
         self._pub_segment = self.create_publisher(String,      '/navigation/segment',  latched_qos)
+        self._pub_event   = self.create_publisher(String,      '/journey/event',       10)
 
         # ---- Subscribers -------------------------------------------------
         self.create_subscription(Odometry,    '/odom',              self._odom_cb,        10)
@@ -214,7 +235,8 @@ class PathFollowerNode(Node):
         self._publish_status()
         self.get_logger().info(
             f'PathFollower ready  coarse_r={self._coarse_r}m  '
-            f'pass_offset={self._pass_offset}m  rate={rate_hz}Hz'
+            f'pass_offset={self._pass_offset}m  rate={rate_hz}Hz  '
+            f'require_marker={self._require_marker}'
         )
 
     # ------------------------------------------------------------------
@@ -293,6 +315,12 @@ class PathFollowerNode(Node):
             f'PathFollower: home recorded at MISSION START '
             f'x={self._home_x:.3f} y={self._home_y:.3f}'
         )
+        self._emit_event(MISSION_STARTED, {
+            'home_x': round(self._home_x, 3),
+            'home_y': round(self._home_y, 3),
+            'waypoint_count': len(self._waypoints),
+            'require_marker': self._require_marker,
+        })
 
         # Kick off navigation
         self._wp_idx = 0
@@ -338,6 +366,15 @@ class PathFollowerNode(Node):
                 f'PathFollower: coarse arrived at WP[{self._wp_idx}] '
                 f'({wp.name})  dist={dist:.2f}m'
             )
+            self._emit_waypoint_arrived(wp, dist, completed=not self._require_marker)
+            if not self._require_marker:
+                self.get_logger().info(
+                    f'PathFollower: marker disabled for bench run — '
+                    f'advancing from WP[{self._wp_idx}] ({wp.name})'
+                )
+                self._stop_robot()
+                self._advance_waypoint()
+                return
             self._set_state(State.COARSE_ARRIVED)
             self._stop_robot()
             return
@@ -397,8 +434,17 @@ class PathFollowerNode(Node):
     def _do_homing(self, dist: float) -> None:
         if dist <= self._home_r:
             self.get_logger().info('PathFollower: home reached — mission DONE')
+            self._emit_event(HOME_REACHED, {
+                'home_x': round(self._home_x, 3),
+                'home_y': round(self._home_y, 3),
+                'distance_to_home_m': round(dist, 3),
+            })
             self._set_state(State.DONE)
             self._stop_robot()
+            self._emit_event(MISSION_COMPLETE, {
+                'final_state': State.DONE.name,
+                'waypoint_count': len(self._waypoints),
+            })
             return
 
         self._drive_toward(self._target_x, self._target_y)
@@ -498,6 +544,33 @@ class PathFollowerNode(Node):
         msg.pose.position.y    = float(y)
         msg.pose.orientation.w = 1.0
         self._pub_wp.publish(msg)
+
+    def _emit_waypoint_arrived(self, wp, dist: float, *, completed: bool) -> None:
+        self._emit_event(WAYPOINT_ARRIVED, {
+            'waypoint_idx': self._wp_idx,
+            'waypoint_name': wp.name,
+            'waypoint_x': round(wp.x, 3),
+            'waypoint_y': round(wp.y, 3),
+            'arrival_mode': 'coarse_only' if completed else 'coarse_then_marker',
+            'distance_to_waypoint_m': round(dist, 3),
+        })
+
+    def _emit_event(self, event_type: str, extra: dict | None = None) -> None:
+        """Publish optional journey events for bench validation runs."""
+        if not self._emit_journey_events:
+            return
+
+        payload = {
+            'type': event_type,
+            'ts': time.time(),
+            'state': self._state.name,
+        }
+        if extra:
+            payload.update(extra)
+
+        msg = String()
+        msg.data = json.dumps(payload, separators=(',', ':'))
+        self._pub_event.publish(msg)
 
 
 # ---------------------------------------------------------------------------

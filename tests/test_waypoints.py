@@ -12,6 +12,7 @@ Completion criteria checked (from docs/steps/step_2.md):
   ✓ home pose 由 mission 开始时记录，而不是程序启动时记录
 """
 
+import json
 import math
 import os
 import sys
@@ -198,6 +199,8 @@ def _make_follower(wp_file: str, **param_overrides) -> PathFollowerNode:
         'k_angular':               1.5,
         'k_linear':                0.4,
         'control_rate_hz':        10.0,
+        'require_marker':         True,
+        'emit_journey_events':    False,
     }
     defaults.update(param_overrides)
 
@@ -210,6 +213,8 @@ def _make_follower(wp_file: str, **param_overrides) -> PathFollowerNode:
     node._max_ang     = defaults['max_angular_vel']
     node._k_ang       = defaults['k_angular']
     node._k_lin       = defaults['k_linear']
+    node._require_marker = defaults['require_marker']
+    node._emit_journey_events = defaults['emit_journey_events']
 
     from auto_nav.navigation.waypoint_provider import WaypointProvider
     from auto_nav.navigation.final_approach    import FinalApproachController
@@ -240,6 +245,7 @@ def _make_follower(wp_file: str, **param_overrides) -> PathFollowerNode:
     node._pub_wp      = MagicMock()
     node._pub_status  = MagicMock()
     node._pub_segment = MagicMock()  # added by Step 3 (/navigation/segment)
+    node._pub_event   = MagicMock()
 
     # Step 3 state variables
     node._local_target_time    = 0.0    # timestamp of last /local_target (0 = never)
@@ -605,6 +611,15 @@ class TestPathFollowerNavigation(unittest.TestCase):
         node._tick()
         self.assertEqual(node._state, State.FINAL_APPROACH)
 
+    def test_bench_mode_coarse_arrival_advances_without_marker(self):
+        """Bench mode: no marker required, waypoint completes at coarse radius."""
+        node = _make_follower(self._wp_file, require_marker=False)
+        node._mode_cb(_String(data='AUTO'))
+        node._robot_x = 9.0
+        node._robot_y = 0.0
+        node._tick()
+        self.assertEqual(node._state, State.HOMING)
+
     def test_final_approach_completes_wp(self):
         """When close enough to pass point → advance waypoint."""
         node = _make_follower(self._wp_file)
@@ -641,6 +656,36 @@ class TestPathFollowerNavigation(unittest.TestCase):
         node._robot_y  = 0.3
         node._tick()
         self.assertEqual(node._state, State.DONE)
+
+    def test_bench_mode_emits_journey_events(self):
+        node = _make_follower(
+            self._wp_file,
+            require_marker=False,
+            emit_journey_events=True,
+        )
+        node._mode_cb(_String(data='AUTO'))
+        start_event = json.loads(node._pub_event.publish.call_args_list[0][0][0].data)
+        self.assertEqual(start_event['type'], 'MISSION_STARTED')
+
+        node._robot_x = 9.0
+        node._robot_y = 0.0
+        node._tick()
+
+        arrived_event = json.loads(node._pub_event.publish.call_args_list[1][0][0].data)
+        self.assertEqual(arrived_event['type'], 'WAYPOINT_ARRIVED')
+        self.assertEqual(arrived_event['waypoint_name'], 'wp1')
+        self.assertEqual(arrived_event['arrival_mode'], 'coarse_only')
+
+        node._robot_x = node._home_x
+        node._robot_y = node._home_y
+        node._tick()
+
+        event_types = [
+            json.loads(call.args[0].data)['type']
+            for call in node._pub_event.publish.call_args_list
+        ]
+        self.assertIn('HOME_REACHED', event_types)
+        self.assertIn('MISSION_COMPLETE', event_types)
 
 
 class TestPathFollowerWaypointAdvance(unittest.TestCase):

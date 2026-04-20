@@ -51,6 +51,7 @@ setup(
             'mode_manager       = auto_nav.teleop.mode_manager_node:main',
             'cmd_gate           = auto_nav.teleop.cmd_gate_node:main',
             'home_pose_recorder = auto_nav.mission.home_pose_recorder:main',
+            'odom_tf_broadcaster = auto_nav.odom_tf_broadcaster:main',
             'path_follower      = auto_nav.navigation.path_follower:main',
             # Step 3: LiDAR avoidance + weaving
             'obstacle_guard     = auto_nav.navigation.obstacle_guard:main',

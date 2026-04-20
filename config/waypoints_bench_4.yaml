@@ -1,0 +1,26 @@
+# Bench waypoint file for the indoor wheel-spin validation.
+#
+# Replace the x/y values below with your four test coordinates before running.
+# The robot records the current odom pose as HOME when AUTO starts, then runs:
+#   HOME -> WP1 -> WP2 -> WP3 -> WP4 -> HOME
+
+waypoints:
+  - name: WP1
+    type: xy
+    x: 1.0
+    y: 0.0
+
+  - name: WP2
+    type: xy
+    x: 1.0
+    y: 1.0
+
+  - name: WP3
+    type: xy
+    x: 0.0
+    y: 1.0
+
+  - name: WP4
+    type: xy
+    x: 0.0
+    y: 0.0

@@ -1,21 +1,22 @@
 """
 teleop.launch.py — Step 1: full gamepad safety control layer.
 
-Assumes bringup.launch.py is already running (joy + watchdog + chassis live).
-bringup already starts joy_node and gamepad_watchdog; this file adds the
-software control stack on top.
+This launch file is self-contained for manual-drive validation: start it and
+the full joystick-to-safety chain comes up without needing bringup.launch.py.
+That matches the Step-1 test goal of validating forward drive, turning, and
+dead-man stop from a single entrypoint.
 
 Nodes started here:
+  joy_node          — gamepad → /joy
   teleop_twist_joy  — /joy axes → /cmd_vel_manual
   joy_mapper        — /joy buttons → /joy/btn_* semantic topics
+  gamepad_watchdog  — /deadman_ok  /joy_connected
   mode_manager      — /control_mode  /emergency_stop
   cmd_gate          — safety arbiter → /cmd_vel_safe (chassis input)
 
-NOT started here (already in bringup.launch.py):
-  joy_node, gamepad_watchdog
-
 CLI arguments:
   gamepad:=ps4          (default) or switch_pro  ← pick your controller
+  joy_dev:=/dev/input/js0
   use_sim_time:=false
 """
 
@@ -48,8 +49,16 @@ def _nodes(context, *args, **kwargs):
 
     sim_params = {'use_sim_time': use_sim_time == 'true'}
 
+    # ---- joy_node: gamepad driver → /joy ---------------------------------
+    joy_node = Node(
+        package='joy',
+        executable='joy_node',
+        name='joy',
+        output='screen',
+        parameters=[cfg, {'dev': joy_dev, **sim_params}],
+    )
+
     # ---- teleop_twist_joy: /joy axes → /cmd_vel_manual --------------------
-    # joy_node is started by bringup.launch.py; no need to start it again here.
     teleop_node = Node(
         package='teleop_twist_joy',
         executable='teleop_node',
@@ -68,8 +77,16 @@ def _nodes(context, *args, **kwargs):
         parameters=[cfg, sim_params],
     )
 
+    # ---- gamepad_watchdog: monitors /joy timestamps ----------------------
+    watchdog_node = Node(
+        package='auto_nav',
+        executable='gamepad_watchdog',
+        name='gamepad_watchdog',
+        output='screen',
+        parameters=[cfg, sim_params],
+    )
+
     # ---- mode_manager: state machine → /control_mode ----------------------
-    # gamepad_watchdog is started by bringup.launch.py; no need to start it again here.
     mode_manager_node = Node(
         package='auto_nav',
         executable='mode_manager',
@@ -89,8 +106,10 @@ def _nodes(context, *args, **kwargs):
 
     return [
         LogInfo(msg=f'[teleop] gamepad profile: {gamepad}  ({cfg})'),
+        joy_node,
         teleop_node,
         joy_mapper_node,
+        watchdog_node,
         mode_manager_node,
         cmd_gate_node,
     ]
@@ -101,6 +120,10 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'gamepad', default_value='ps4',
             description='Gamepad profile: ps4 | switch_pro',
+        ),
+        DeclareLaunchArgument(
+            'joy_dev', default_value='/dev/input/js0',
+            description='Joystick device path',
         ),
         DeclareLaunchArgument(
             'use_sim_time', default_value='false',

@@ -31,14 +31,22 @@
     #   and ``tf2_echo base_link camera_link``; in RViz2 show TF and visually align
     #   scan/image with the robot body; small errors show as consistent offset in fusion.
     # base_link → laser (forward-mounted LiDAR)
+    # URDF reference:
+    #   base_link → chassis     = (0.00, 0.00, 0.177)
+    #   chassis   → laser_frame = (0.20, 0.00, 0.104)
+    #   total base_link → laser = (0.20, 0.00, 0.281)
     laser_x: 0.20
     laser_y: 0.00
-    laser_z: 0.18
+    laser_z: 0.281
 
     # base_link → camera_link (front-centre, slightly elevated)
-    camera_x: 0.25
+    # URDF reference:
+    #   base_link → chassis   = (0.00, 0.00, 0.177)
+    #   chassis   → cam_frame = (0.24, 0.00, 0.084)
+    #   total base_link → cam = (0.24, 0.00, 0.261)
+    camera_x: 0.24
     camera_y: 0.00
-    camera_z: 0.22
+    camera_z: 0.261
 
     # ------- Watchdog / safety -------
     cmd_vel_timeout_sec: 0.5   # stop if no cmd_vel received within this window

@@ -3,12 +3,13 @@ bringup.launch.py — Step 0: bring all hardware alive.
 
 Launches (in order of dependency):
   1. ariaNode         — Pioneer 3-AT chassis driver  → /odom /cmd_vel
-  2. sick_scan_xd OR lakibeam_ros2 — LiDAR driver    → /scan
-  3. depthai_ros_driver             — OAK-D V2 camera → /camera/*   (optional)
-  4. joy_node                       — Bluetooth gamepad → /joy
-  5. static_transform_publisher ×2  — base_link→laser, base_link→camera_link
+  2. odom_tf_broadcaster           — /odom pose        → /tf (odom→base_link)
+  3. sick_scan_xd OR lakibeam_ros2 — LiDAR driver      → /scan
+  4. depthai_ros_driver             — OAK-D V2 camera   → /camera/*   (optional)
+  5. joy_node                       — Bluetooth gamepad → /joy
+  6. static_transform_publisher ×2  — base_link→laser, base_link→camera_link
      (translation xyz read from config/robot.yaml at launch)
-  6. gamepad_watchdog               — /joy_connected /deadman_ok
+  7. gamepad_watchdog               — /joy_connected /deadman_ok
 
 NOT here (belongs in navigation.launch.py):
   home_pose_recorder  — moved to avoid duplicate when navigation.launch.py runs
@@ -27,8 +28,9 @@ CLI arguments (all have defaults; override on command line):
 
 import os
 
+from auto_nav.config_params import load_ros_param_from_files
 from auto_nav.robot_extrinsics import (
-    load_sensor_xyz_from_robot_yaml,
+    load_sensor_xyz_from_files,
     static_transform_arguments,
 )
 from ament_index_python.packages import get_package_share_directory
@@ -131,6 +133,7 @@ def generate_launch_description() -> LaunchDescription:
         arguments=['--rp', serial_port],
         parameters=[
             _cfg('robot.yaml'),
+            _cfg('real.yaml'),
             {
                 'serial_port': serial_port,
                 'port': serial_port,          # alias — whichever name ariaNode uses
@@ -145,22 +148,13 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ---- 2a. SICK LiDAR (sick_scan_xd) ------------------------------------
-    # No condition here — selection is handled inside OpaqueFunction _lidar_nodes().
-    sick_node = Node(
-        package='sick_scan_xd',
-        executable='sick_generic_caller',
-        name='sick_scan',
+    # ---- 1b. Convert /odom pose to the standard odom -> base_link TF -----
+    odom_tf_node = Node(
+        package='auto_nav',
+        executable='odom_tf_broadcaster',
+        name='odom_tf_broadcaster',
         output='screen',
-        parameters=[
-            _cfg('lidar.yaml'),
-            {
-                'hostname': sick_ip,
-                'frame_id': 'laser',
-                'use_sim_time': use_sim_time,
-            },
-        ],
-        remappings=[('/cloud', '/scan_cloud')],
+        parameters=[{'use_sim_time': use_sim_time}],
     )
 
     # ---- 2b. Lakibeam LiDAR -----------------------------------------------
@@ -171,6 +165,7 @@ def generate_launch_description() -> LaunchDescription:
         output='screen',
         parameters=[
             _cfg('lidar.yaml'),
+            _cfg('real.yaml'),
             {
                 'hostname': lakibeam_ip,
                 'frame_id': 'laser',
@@ -189,13 +184,13 @@ def generate_launch_description() -> LaunchDescription:
 
     # ---- 5. Static TF publishers (xyz from config/robot.yaml) ------------
     def _sensor_static_tf(context, *args, **kwargs):
-        """Publish base_link→laser and base_link→camera_link from robot.yaml."""
-        cfg_path = _cfg('robot.yaml')
+        """Publish base_link→laser and base_link→camera_link from layered config."""
+        cfg_paths = [_cfg('robot.yaml'), _cfg('real.yaml')]
         try:
-            ex = load_sensor_xyz_from_robot_yaml(cfg_path)
+            ex = load_sensor_xyz_from_files(cfg_paths)
         except (OSError, ValueError) as e:
             raise RuntimeError(
-                f'[bringup] Failed to read laser/camera XYZ from {cfg_path}: {e}'
+                f'[bringup] Failed to read laser/camera XYZ from {cfg_paths}: {e}'
             ) from e
 
         use_sim = context.launch_configurations.get('use_sim_time', 'false')
@@ -224,6 +219,18 @@ def generate_launch_description() -> LaunchDescription:
     # ---- Assemble with lidar + gamepad resolved via OpaqueFunction ---------
     # home_pose_recorder is intentionally NOT here — it lives in navigation.launch.py
     # to avoid duplicate nodes when both launch files run together.
+    def _sick_scan_topic() -> str:
+        """Resolve the driver-native SICK LaserScan topic from layered config."""
+        cfg_paths = [_cfg('lidar.yaml'), _cfg('real.yaml')]
+        scanner_type = load_ros_param_from_files(
+            cfg_paths,
+            node_name='sick_scan',
+            key='scanner_type',
+        ).strip()
+        if not scanner_type:
+            raise ValueError('scanner_type for sick_scan cannot be empty')
+        return f'/{scanner_type}/scan'
+
     def _lidar_nodes(context, *args, **kwargs):
         """Select LiDAR driver at launch time — avoids IfCondition string hack."""
         lt = context.launch_configurations.get('lidar_type', 'sick').strip().lower()
@@ -231,8 +238,35 @@ def generate_launch_description() -> LaunchDescription:
             LogInfo(msg='[bringup] Starting Lakibeam LiDAR driver').execute(context)
             return [lakibeam_node]
         else:
+            sick_scan_topic = _sick_scan_topic()
             LogInfo(msg='[bringup] Starting SICK LiDAR driver (sick_scan_xd)').execute(context)
-            return [sick_node]
+            return [
+                Node(
+                    package='sick_scan_xd',
+                    executable='sick_generic_caller',
+                    name='sick_scan',
+                    output='screen',
+                    parameters=[
+                        _cfg('lidar.yaml'),
+                        _cfg('real.yaml'),
+                        {
+                            'hostname': sick_ip,
+                            'frame_id': 'laser',
+                            'use_sim_time': use_sim_time,
+                        },
+                    ],
+                    remappings=[
+                        # Normalise the driver-native topic to the project-wide /scan API.
+                        (sick_scan_topic, '/scan'),
+                        ('scan', '/scan'),
+                        # Keep vendor TF out of the project-wide TF tree. The course
+                        # stack already defines odom -> base_link -> laser explicitly.
+                        ('/tf', '/sick_scan/tf'),
+                        ('/tf_static', '/sick_scan/tf_static'),
+                        ('/cloud', '/scan_cloud'),
+                    ],
+                )
+            ]
 
     def _camera_nodes(context, *args, **kwargs):
         """Only launch camera driver when use_camera:=true."""
@@ -250,6 +284,7 @@ def generate_launch_description() -> LaunchDescription:
                 output='screen',
                 parameters=[
                     _cfg('camera.yaml'),
+                    _cfg('real.yaml'),
                     {
                         'i_mx_id': cam_mx_id,
                         'use_sim_time': use_sim_time == 'true',
@@ -301,6 +336,7 @@ def generate_launch_description() -> LaunchDescription:
         args + [
             LogInfo(msg='=== auto_nav bringup: Step 0 ==='),
             aria_node,
+            odom_tf_node,
             OpaqueFunction(function=_lidar_nodes),
             OpaqueFunction(function=_camera_nodes),
             OpaqueFunction(function=_gamepad_nodes),
