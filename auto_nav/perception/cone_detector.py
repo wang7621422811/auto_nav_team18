@@ -84,6 +84,7 @@ class ConeDetectorNode(Node):
 
         # --- publishers -------------------------------------------------
         self._pub_pose = self.create_publisher(PoseStamped, "/marker/detection", 10)
+        # publish msg for the object detector
         self._pub_bbox = self.create_publisher(String,       "/marker/bbox",      10)
 
         self.get_logger().info("ConeDetectorNode ready — orange HSV "
