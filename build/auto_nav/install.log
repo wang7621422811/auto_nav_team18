@@ -1,4 +1,7 @@
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/robot_extrinsics.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/__init__.py
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/config_params.py
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/odom_tf_broadcaster.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/gamepad_watchdog_node.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/cmd_gate_node.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/joy_mapper_node.py
@@ -25,7 +28,10 @@
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/journey_logger.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/__init__.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/summary_generator.py
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/__pycache__/robot_extrinsics.cpython-312.pyc
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/__pycache__/__init__.cpython-312.pyc
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/__pycache__/config_params.cpython-312.pyc
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/__pycache__/odom_tf_broadcaster.cpython-312.pyc
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/__pycache__/gamepad_watchdog_node.cpython-312.pyc
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/__pycache__/cmd_gate_node.cpython-312.pyc
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/teleop/__pycache__/joy_mapper_node.cpython-312.pyc
@@ -54,6 +60,7 @@
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/python3.12/site-packages/auto_nav/mission/__pycache__/summary_generator.cpython-312.pyc
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/ament_index/resource_index/packages/auto_nav
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/package.xml
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch/navigation_bench.launch.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch/bringup.launch.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch/navigation.launch.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch/mission.launch.py
@@ -61,6 +68,7 @@
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/launch/perception.launch.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/real.yaml
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/waypoints_data.yaml
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/waypoints_bench_4.yaml
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/robot.yaml
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/lidar.yaml
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/waypoints.yaml
@@ -68,11 +76,16 @@
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/camera.yaml
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/gamepad/ps4.yaml
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/gamepad/switch_pro.yaml
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup/sim_perception.launch.py
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup/sim_photo_trigger.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup/sim_bringup.launch.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup/rviz.launch.py
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup/bridge.yaml
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_bringup/sim_camera.yaml
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_robot_description/pioneer.urdf
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_worlds/pioneer3at_slalom.world
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_worlds/new_world.sdf
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/sim_worlds/uwa_oval.sdf
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes/suporte_base_mesh.dae
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes/axle.dae
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/simulation/meshes/kinect.dae
@@ -119,6 +132,7 @@
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav/mode_manager
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav/object_detector
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav/obstacle_guard
+/home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav/odom_tf_broadcaster
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav/path_follower
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav/photo_capture
 /home/parallels/workspace/auto_nav_team18/install/auto_nav/lib/auto_nav/sim_init

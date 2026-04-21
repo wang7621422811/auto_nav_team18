@@ -31,7 +31,8 @@ setup(
          glob('auto_nav/simulation/sim_robot_description/*.urdf')),
         # World files
         (os.path.join('share', package_name, 'simulation', 'sim_worlds'),
-         glob('auto_nav/simulation/sim_worlds/*.world')),
+         glob('auto_nav/simulation/sim_worlds/*.world')
+         + glob('auto_nav/simulation/sim_worlds/*.sdf')),
         # Meshes (.dae and .stl) — required for package:// URI resolution
         (os.path.join('share', package_name, 'simulation', 'meshes'),
          glob('auto_nav/simulation/meshes/*.dae')

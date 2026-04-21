@@ -13,12 +13,24 @@
 #   lon: -0.0106
 
 waypoints:
-  - name: wp1
+  # Orange cones in auto_nav/simulation/sim_worlds/new_world.sdf.
+  # Order is chosen to start in the lower half of the map, then sweep clockwise.
+  - name: orange_cone_3
     type: xy
-    x: 8.0
-    y: 0.0
+    x: -11.0
+    y: -11.0
 
-  - name: wp2
+  - name: orange_cone_4
+    type: xy
+    x: 11.0
+    y: -12.0
+
+  - name: orange_cone_1
     type: xy
     x: 8.0
-    y: 8.0
+    y: 18.0
+
+  - name: orange_cone_2
+    type: xy
+    x: -12.0
+    y: 12.0

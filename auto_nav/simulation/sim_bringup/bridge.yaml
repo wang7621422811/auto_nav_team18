@@ -9,8 +9,8 @@
   gz_type_name:   "gz.msgs.Clock"
   direction:      GZ_TO_ROS
 
-# teleop_twist_keyboard publishes to /cmd_vel → bridged straight to Gazebo
-- ros_topic_name: "/cmd_vel"
+# Safety gate is the only motion output: bridge /cmd_vel_safe into Gazebo.
+- ros_topic_name: "/cmd_vel_safe"
   gz_topic_name:  "/cmd_vel"
   ros_type_name:  "geometry_msgs/msg/Twist"
   gz_type_name:   "gz.msgs.Twist"

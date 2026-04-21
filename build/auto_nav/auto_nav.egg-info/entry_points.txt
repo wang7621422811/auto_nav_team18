@@ -12,6 +12,7 @@ mission_controller = auto_nav.mission.mission_controller:main
 mode_manager = auto_nav.teleop.mode_manager_node:main
 object_detector = auto_nav.perception.object_detector:main
 obstacle_guard = auto_nav.navigation.obstacle_guard:main
+odom_tf_broadcaster = auto_nav.odom_tf_broadcaster:main
 path_follower = auto_nav.navigation.path_follower:main
 photo_capture = auto_nav.perception.photo_capture:main
 sim_init = auto_nav.simulation.sim_bringup.sim_init_node:main

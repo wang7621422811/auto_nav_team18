@@ -19,6 +19,8 @@ import sys
 import tempfile
 import types
 import unittest
+import xml.etree.ElementTree as ET
+from pathlib import Path
 import yaml
 from unittest.mock import MagicMock
 
@@ -167,6 +169,9 @@ from auto_nav.navigation.final_approach   import FinalApproachController       #
 from auto_nav.navigation.path_follower    import (                             # noqa: E402
     PathFollowerNode, State, _quat_to_yaw, _angle_wrap,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +415,28 @@ class TestWaypointProviderXY(unittest.TestCase):
         prov = WaypointProvider(path)
         self.assertEqual(len(prov), 1)
         self.assertAlmostEqual(prov[0].x, 7.0)
+
+    def test_repo_waypoints_match_new_world_orange_cones(self):
+        """Keep config/waypoints_data.yaml aligned with orange cones in new_world.sdf."""
+        world_path = REPO_ROOT / 'auto_nav' / 'simulation' / 'sim_worlds' / 'new_world.sdf'
+        waypoints_path = REPO_ROOT / 'config' / 'waypoints_data.yaml'
+
+        tree = ET.parse(world_path)
+        root = tree.getroot()
+
+        orange_cones = set()
+        for model in root.findall('.//model'):
+            name = model.attrib.get('name', '')
+            if not name.startswith('orange_cone_'):
+                continue
+            pose_text = (model.findtext('pose') or '').strip()
+            pose_vals = [float(v) for v in pose_text.split()]
+            orange_cones.add((name, pose_vals[0], pose_vals[1]))
+
+        provider = WaypointProvider(waypoints_path)
+        waypoint_set = {(wp.name, wp.x, wp.y) for wp in provider.waypoints}
+
+        self.assertEqual(waypoint_set, orange_cones)
 
 
 # ---------------------------------------------------------------------------
