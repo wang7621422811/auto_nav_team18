@@ -5,7 +5,7 @@ Launches (in order of dependency):
   1. ariaNode         — Pioneer 3-AT chassis driver  → /odom /cmd_vel
   2. odom_tf_broadcaster           — /odom pose        → /tf (odom→base_link)
   3. sick_scan_xd OR lakibeam_ros2 — LiDAR driver      → /scan
-  4. depthai_ros_driver             — OAK-D V2 camera   → /camera/*   (optional)
+  4. oakd_camera                    — OAK-D V2 camera   → /camera/*   (optional)
   5. joy_node                       — Bluetooth gamepad → /joy
   6. static_transform_publisher ×2  — base_link→laser, base_link→camera_link
      (translation xyz read from config/robot.yaml at launch)
@@ -19,7 +19,7 @@ CLI arguments (all have defaults; override on command line):
   serial_port:=/dev/ttyUSB0
   sick_ip:=192.168.0.1
   lakibeam_ip:=192.168.1.200
-  use_camera:=true | false  (false skips depthai_ros_driver; safe when camera not available)
+  use_camera:=true | false  (false skips oakd_camera; safe when camera not available)
   camera_mx_id:=          (empty = auto)
   use_sim_time:=false
   aria_pkg:=ariaNode
@@ -105,7 +105,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             'use_camera', default_value='true',
-            description='Launch OAK-D camera driver (set false if depthai_ros_driver not installed)',
+            description='Launch OAK-D camera node (set false if camera hardware is not available)',
         ),
     ]
 
@@ -174,10 +174,7 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ---- 3. OAK-D V2 camera (depthai_ros_driver) — optional -----------------
-    # Created inside OpaqueFunction _camera_nodes() so the package lookup only
-    # happens when use_camera:=true, avoiding "package not found" on machines
-    # that don't have depthai_ros_driver installed.
+    # ---- 3. OAK-D V2 camera (local DepthAI node) — optional -----------------
 
     # ---- 4. Joy + Gamepad watchdog (profile resolved via OpaqueFunction) ------
     # Actual node creation happens in _gamepad_nodes() below.
@@ -273,26 +270,22 @@ def generate_launch_description() -> LaunchDescription:
         if context.launch_configurations.get('use_camera', 'true').lower() != 'true':
             LogInfo(msg='[bringup] Camera disabled (use_camera:=false)').execute(context)
             return []
-        LogInfo(msg='[bringup] Starting OAK-D camera driver').execute(context)
+        LogInfo(msg='[bringup] Starting OAK-D camera node').execute(context)
         cam_mx_id    = context.launch_configurations.get('camera_mx_id', '')
         use_sim_time = context.launch_configurations.get('use_sim_time', 'false')
         return [
             Node(
-                package='depthai_ros_driver',
-                executable='camera_node',
+                package='auto_nav',
+                executable='oakd_camera',
                 name='camera',
                 output='screen',
                 parameters=[
                     _cfg('camera.yaml'),
                     _cfg('real.yaml'),
                     {
-                        'i_mx_id': cam_mx_id,
+                        'mx_id': cam_mx_id,
                         'use_sim_time': use_sim_time == 'true',
                     },
-                ],
-                remappings=[
-                    ('~/color/image', '/camera/color/image_raw'),
-                    ('~/depth/image', '/camera/depth/image_raw'),
                 ],
             )
         ]

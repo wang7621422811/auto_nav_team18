@@ -7,7 +7,8 @@ actually moves the robot.
 
 Decision logic (in priority order):
   1. Joystick lost          → publish zero
-  2. Emergency stop latched → publish zero
+  2. Emergency stop latched → in MANUAL allow reverse-only escape;
+                               otherwise publish zero
   3. mode == MANUAL         → forward /cmd_vel_manual
   4. mode == AUTO and deadman_ok → forward /cmd_vel_auto
   5. anything else          → publish zero  (includes PAUSED, ABORTED)
@@ -127,7 +128,7 @@ class CmdGateNode(Node):
             return _ZERO
 
         if self._estop:
-            return _ZERO
+            return self._reverse_escape_command()
 
         if self._mode == self.MANUAL:
             return self._cmd_manual
@@ -137,6 +138,26 @@ class CmdGateNode(Node):
 
         # PAUSED, ABORTED, or AUTO without deadman
         return _ZERO
+
+    def _reverse_escape_command(self) -> Twist:
+        """
+        While obstacle estop is active, allow the operator to back out manually.
+
+        This keeps the safety stop effective for all forward motion, but avoids
+        trapping the robot against a wall where the LiDAR continues to see the
+        obstacle inside the front safety sector.  Reverse escape is deliberately
+        restricted to MANUAL mode and strips angular velocity to keep the
+        behaviour predictable during recovery.
+        """
+        if self._mode != self.MANUAL:
+            return _ZERO
+
+        if self._cmd_manual.linear.x >= 0.0:
+            return _ZERO
+
+        out = Twist()
+        out.linear.x = self._cmd_manual.linear.x
+        return out
 
 
 def main(args=None):

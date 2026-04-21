@@ -411,6 +411,30 @@ class TestCmdGate(unittest.TestCase):
         out = self._last_published(node)
         self.assertEqual(out.linear.x, 0.0)
 
+    def test_estop_allows_manual_reverse_escape(self):
+        node = _make_cmd_gate()
+        node._mode  = CmdGateNode.MANUAL
+        node._estop = True
+        manual_cmd  = _Twist()
+        manual_cmd.linear.x = -0.4
+        manual_cmd.angular.z = 0.8
+        node._cmd_manual = manual_cmd
+        node._gate()
+        out = self._last_published(node)
+        self.assertEqual(out.linear.x, -0.4)
+        self.assertEqual(out.angular.z, 0.0)
+
+    def test_estop_blocks_reverse_escape_outside_manual(self):
+        node = _make_cmd_gate()
+        node._mode  = CmdGateNode.AUTO
+        node._estop = True
+        manual_cmd  = _Twist()
+        manual_cmd.linear.x = -0.4
+        node._cmd_manual = manual_cmd
+        node._gate()
+        out = self._last_published(node)
+        self.assertEqual(out.linear.x, 0.0)
+
     # ---- MANUAL mode -----------------------------------------------------
 
     def test_manual_mode_forwards_manual_cmd(self):

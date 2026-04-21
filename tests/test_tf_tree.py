@@ -185,6 +185,36 @@ def test_bringup_launch_includes_odom_tf_broadcaster() -> None:
     assert odom_tf_node.executable == 'odom_tf_broadcaster'
 
 
+def test_bringup_launch_uses_local_oakd_camera_node() -> None:
+    module = _load_bringup_launch_module()
+    launch_description = module.generate_launch_description()
+
+    camera_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_camera_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={
+            'use_camera': 'true',
+            'camera_mx_id': 'oak-test-id',
+            'use_sim_time': 'false',
+        }
+    )
+    nodes = camera_op.function(context)
+
+    assert len(nodes) == 1
+    camera_node = nodes[0]
+    assert camera_node.package == 'auto_nav'
+    assert camera_node.executable == 'oakd_camera'
+    assert camera_node.name == 'camera'
+    assert any(
+        isinstance(params, dict) and params.get('mx_id') == 'oak-test-id'
+        for params in camera_node.parameters
+    )
+
+
 def test_bringup_launch_isolates_vendor_sick_tf_from_main_tree() -> None:
     module = _load_bringup_launch_module()
     launch_description = module.generate_launch_description()
