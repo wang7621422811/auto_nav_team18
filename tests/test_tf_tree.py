@@ -171,18 +171,24 @@ def test_bringup_launch_publishes_static_sensor_tf_chain() -> None:
     ]
 
 
-def test_bringup_launch_includes_odom_tf_broadcaster() -> None:
+def test_bringup_launch_declares_pose_source_switch() -> None:
     module = _load_bringup_launch_module()
     launch_description = module.generate_launch_description()
 
-    odom_tf_node = next(
+    pose_source_op = next(
         entity
         for entity in launch_description.entities
-        if isinstance(entity, _FakeNode) and entity.name == 'odom_tf_broadcaster'
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_pose_source_nodes'
     )
 
+    gps_nodes = pose_source_op.function(types.SimpleNamespace(launch_configurations={'use_gps': 'true'}))
+    odom_nodes = pose_source_op.function(types.SimpleNamespace(launch_configurations={'use_gps': 'false'}))
+
+    odom_tf_node = odom_nodes[0]
     assert odom_tf_node.package == 'auto_nav'
     assert odom_tf_node.executable == 'odom_tf_broadcaster'
+    assert gps_nodes[0].package == 'auto_nav'
+    assert gps_nodes[0].executable == 'outdoor_pose_fuser'
 
 
 def test_bringup_launch_isolates_vendor_sick_tf_from_main_tree() -> None:

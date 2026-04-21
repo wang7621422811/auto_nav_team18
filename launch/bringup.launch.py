@@ -22,6 +22,7 @@ CLI arguments (all have defaults; override on command line):
   use_camera:=true | false  (false skips depthai_ros_driver; safe when camera not available)
   camera_mx_id:=          (empty = auto)
   use_sim_time:=false
+  use_gps:=false
   aria_pkg:=ariaNode
   aria_exec:=ariaNode     (confirmed via `ros2 pkg executables ariaNode` on pioneer1)
 """
@@ -90,6 +91,10 @@ def generate_launch_description() -> LaunchDescription:
             description='Joystick device path',
         ),
         DeclareLaunchArgument(
+            'use_gps', default_value='false',
+            description='Enable outdoor GPS pose fusion and publish /nav/odom',
+        ),
+        DeclareLaunchArgument(
             'gamepad', default_value='ps4',
             description='Gamepad profile: ps4 | switch_pro',
         ),
@@ -117,6 +122,7 @@ def generate_launch_description() -> LaunchDescription:
     camera_mx_id = LaunchConfiguration('camera_mx_id')
     use_sim_time = LaunchConfiguration('use_sim_time')
     joy_dev      = LaunchConfiguration('joy_dev')
+    use_gps      = LaunchConfiguration('use_gps')
     aria_pkg     = LaunchConfiguration('aria_pkg')
     aria_exec    = LaunchConfiguration('aria_exec')
 
@@ -148,13 +154,24 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ---- 1b. Convert /odom pose to the standard odom -> base_link TF -----
+    # ---- 1b. Pose source selection ---------------------------------------
     odom_tf_node = Node(
         package='auto_nav',
         executable='odom_tf_broadcaster',
         name='odom_tf_broadcaster',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    outdoor_pose_fuser_node = Node(
+        package='auto_nav',
+        executable='outdoor_pose_fuser',
+        name='outdoor_pose_fuser',
+        output='screen',
+        parameters=[
+            _cfg('gps.yaml'),
+            {'use_sim_time': use_sim_time},
+        ],
     )
 
     # ---- 2b. Lakibeam LiDAR -----------------------------------------------
@@ -332,11 +349,19 @@ def generate_launch_description() -> LaunchDescription:
         )
         return [joy_node, watchdog_node]
 
+    def _pose_source_nodes(context, *args, **kwargs):
+        """Select odom TF broadcaster or GPS pose fusion at launch time."""
+        if context.launch_configurations.get('use_gps', 'false').lower() == 'true':
+            LogInfo(msg='[bringup] GPS mode enabled: outdoor_pose_fuser owns TF').execute(context)
+            return [outdoor_pose_fuser_node]
+        LogInfo(msg='[bringup] GPS mode disabled: using odom_tf_broadcaster').execute(context)
+        return [odom_tf_node]
+
     ld = LaunchDescription(
         args + [
             LogInfo(msg='=== auto_nav bringup: Step 0 ==='),
             aria_node,
-            odom_tf_node,
+            OpaqueFunction(function=_pose_source_nodes),
             OpaqueFunction(function=_lidar_nodes),
             OpaqueFunction(function=_camera_nodes),
             OpaqueFunction(function=_gamepad_nodes),

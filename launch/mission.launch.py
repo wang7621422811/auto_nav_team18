@@ -38,7 +38,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -56,51 +56,60 @@ def generate_launch_description() -> LaunchDescription:
             'use_sim_time', default_value='false',
             description='Use simulation clock',
         ),
+        DeclareLaunchArgument(
+            'use_gps', default_value='false',
+            description='Remap mission odom inputs from /odom to /nav/odom',
+        ),
     ]
 
     use_sim_time = LaunchConfiguration('use_sim_time')
+    def _mission_nodes(context, *args, **kwargs):
+        use_nav_odom = context.launch_configurations.get('use_gps', 'false').lower() == 'true'
+        odom_remap = [('/odom', '/nav/odom')] if use_nav_odom else []
 
-    # ── mission_controller ─────────────────────────────────────────────────
-    mission_controller_node = Node(
-        package='auto_nav',
-        executable='mission_controller',
-        name='mission_controller',
-        output='screen',
-        parameters=[
-            _cfg('mission.yaml'),
-            {'use_sim_time': use_sim_time},
-        ],
-    )
+        mission_controller_node = Node(
+            package='auto_nav',
+            executable='mission_controller',
+            name='mission_controller',
+            output='screen',
+            parameters=[
+                _cfg('mission.yaml'),
+                {'use_sim_time': use_sim_time},
+            ],
+            remappings=odom_remap,
+        )
 
-    # ── journey_logger ─────────────────────────────────────────────────────
-    journey_logger_node = Node(
-        package='auto_nav',
-        executable='journey_logger',
-        name='journey_logger',
-        output='screen',
-        parameters=[
-            _cfg('mission.yaml'),
-            {'use_sim_time': use_sim_time},
-        ],
-    )
+        journey_logger_node = Node(
+            package='auto_nav',
+            executable='journey_logger',
+            name='journey_logger',
+            output='screen',
+            parameters=[
+                _cfg('mission.yaml'),
+                {'use_sim_time': use_sim_time},
+            ],
+        )
 
-    # ── summary_generator ──────────────────────────────────────────────────
-    summary_generator_node = Node(
-        package='auto_nav',
-        executable='summary_generator',
-        name='summary_generator',
-        output='screen',
-        parameters=[
-            _cfg('mission.yaml'),
-            {'use_sim_time': use_sim_time},
-        ],
-    )
+        summary_generator_node = Node(
+            package='auto_nav',
+            executable='summary_generator',
+            name='summary_generator',
+            output='screen',
+            parameters=[
+                _cfg('mission.yaml'),
+                {'use_sim_time': use_sim_time},
+            ],
+        )
+
+        return [
+            mission_controller_node,
+            journey_logger_node,
+            summary_generator_node,
+        ]
 
     return LaunchDescription(
         args + [
             LogInfo(msg='=== auto_nav Step 5: Mission Controller state machine ==='),
-            mission_controller_node,
-            journey_logger_node,
-            summary_generator_node,
+            OpaqueFunction(function=_mission_nodes),
         ]
     )

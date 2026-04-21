@@ -1,0 +1,24 @@
+# waypoints_real_gps.yaml — example outdoor waypoint list in GPS coordinates.
+#
+# This file follows the same schema as waypoints_data.yaml, but each waypoint
+# uses GPS and is converted into the shared ENU frame defined by `origin`.
+
+origin:
+  lat: -31.9800
+  lon: 115.8200
+
+waypoints:
+  - name: outdoor_wp_1
+    type: gps
+    lat: -31.97995
+    lon: 115.82004
+
+  - name: outdoor_wp_2
+    type: gps
+    lat: -31.97990
+    lon: 115.82008
+
+  - name: outdoor_wp_3
+    type: gps
+    lat: -31.97985
+    lon: 115.82002

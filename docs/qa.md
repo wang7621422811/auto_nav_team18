@@ -43,3 +43,38 @@
 - `topic hz` 有持续输出频率：说明确实在持续发图像。
 - `topic echo --once` 能打印出一条 `sensor_msgs/msg/Image`：说明至少收到过一帧。
 - `image_view` 能显示实时画面：说明数据内容正常，不只是空 topic。
+
+### 问题
+GPS waypoint 已支持，但机器人当前位置仍然只来自原始 `/odom`，会导致 GPS waypoint 与机器人位姿不在同一坐标系；同时导航节点如果读 `/nav/odom`，TF 还来自 `/odom`，会出现 TF 不一致。
+
+### 结论
+按 `docs/steps/gps_function.md` 新增 `outdoor_pose_fuser`，在 GPS 模式下负责：
+- 将 `/fix` 转成 ENU；
+- 用首个有效 GPS fix 与当前 `/odom` 建立启动对齐；
+- 轻量融合 GPS 位置与 wheel odom；
+- 发布 `/nav/odom`；
+- 发布与 `/nav/odom` 一致的 `odom -> base_link` TF。
+
+### 这次改动
+- 新增 `auto_nav/navigation/outdoor_pose_fuser.py`。
+- 新增 `config/gps.yaml`，集中保存 GPS 融合参数。
+- 新增 `config/waypoints_real_gps.yaml`，提供室外 GPS waypoint 样例。
+- 修改 `launch/bringup.launch.py`，增加 `use_gps` 开关。
+- 修改 `launch/navigation.launch.py` 与 `launch/mission.launch.py`，在 GPS 模式下把相关 `/odom` 输入 remap 到 `/nav/odom`。
+- 修改 `setup.py` 注册 `outdoor_pose_fuser` 可执行入口。
+- 新增 `tests/test_outdoor_pose_fuser.py` 与 `tests/test_gps_launch.py`。
+- 扩展 `tests/test_waypoints.py`、`tests/test_tf_tree.py`。
+
+### 关键实现
+- `outdoor_pose_fuser` 首次拿到有效 fix 时，记录：
+  - `gps_init_e/gps_init_n`
+  - `odom_init_x/odom_init_y`
+- 后续 GPS 点统一做平移对齐：
+  - `aligned_x = odom_init_x + (gps_e - gps_init_e)`
+  - `aligned_y = odom_init_y + (gps_n - gps_init_n)`
+- GPS 正常时，输出 `raw_odom + alpha * (aligned_gps - raw_odom)` 的平滑位置。
+- GPS 超时或无效时，退化回原始 odom 位置，同时保留 IMU yaw。
+- GPS 模式下不再启用 `odom_tf_broadcaster`，避免双重 TF 源。
+
+### 补充说明
+- 为了让 GPS 机器人位姿与 GPS waypoint 使用同一个 ENU 参考，本次在 `config/gps.yaml` 中增加了 `gps_origin_lat/gps_origin_lon`。这一点是对计划的必要补充，否则 `/fix` 无法转换到与 waypoint 相同的平面坐标系。

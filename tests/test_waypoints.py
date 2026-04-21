@@ -393,6 +393,22 @@ class TestWaypointProviderXY(unittest.TestCase):
         self.assertAlmostEqual(prov[0].x, 0.0, places=2)
         self.assertAlmostEqual(prov[0].y, 0.0, places=2)
 
+    def test_multiple_gps_waypoints_share_one_origin_frame(self):
+        path = _write_waypoints_yaml(
+            self._tmpdir,
+            [
+                {'name': 'g1', 'type': 'gps', 'lat': -31.97995, 'lon': 115.82004},
+                {'name': 'g2', 'type': 'gps', 'lat': -31.97990, 'lon': 115.82008},
+            ],
+            origin={'lat': -31.9800, 'lon': 115.8200},
+        )
+        prov = WaypointProvider(path)
+        self.assertEqual(len(prov), 2)
+        self.assertGreater(prov[0].x, 0.0)
+        self.assertGreater(prov[0].y, 0.0)
+        self.assertGreater(prov[1].x, prov[0].x)
+        self.assertGreater(prov[1].y, prov[0].y)
+
     def test_iteration(self):
         path = _write_waypoints_yaml(self._tmpdir, [
             {'name': 'a', 'type': 'xy', 'x': 1.0, 'y': 0.0},

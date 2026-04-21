@@ -1,0 +1,23 @@
+# gps.yaml — parameters for outdoor_pose_fuser.
+#
+# The origin here must match the GPS waypoint file so both the robot pose and
+# the waypoint list are expressed in the same ENU frame.
+
+outdoor_pose_fuser:
+  ros__parameters:
+    gps_fix_topic: /fix
+    imu_topic: /imu/data
+    odom_in_topic: /odom
+    odom_out_topic: /nav/odom
+    status_topic: /nav/status
+    publish_tf: true
+
+    gps_position_alpha: 0.1
+    gps_jump_reject_m: 8.0
+    fix_timeout_s: 2.0
+    use_imu_yaw: true
+    align_on_first_valid_fix: true
+
+    # Keep this origin aligned with config/waypoints_real_gps.yaml.
+    gps_origin_lat: -31.9800
+    gps_origin_lon: 115.8200
