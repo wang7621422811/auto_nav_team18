@@ -19,4 +19,5 @@ install/
 
 # 环境变量、密钥文件
 .env
-.env.local
+.env.local__pycache__/
+*.pyc
