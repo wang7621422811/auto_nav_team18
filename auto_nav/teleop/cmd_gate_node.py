@@ -132,9 +132,6 @@ class CmdGateNode(Node):
             return _ZERO
 
         if self._estop:
-            return _ZERO
-
-        if self._estop:
             return self._reverse_escape_command()
 
         if self._mode == self.MANUAL:

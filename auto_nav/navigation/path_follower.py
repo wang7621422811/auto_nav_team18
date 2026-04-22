@@ -65,6 +65,11 @@ Parameters  (path_follower section of config/waypoints.yaml):
   k_linear                  proportional distance gain                 (default 0.4)
   control_rate_hz           control-loop frequency                     (default 10.0)
   local_target_timeout_s    seconds before /local_target is considered stale (default 0.5)
+  local_target_max_heading_deg
+                            ignore /local_target when it lies too far
+                            outside the robot's forward sector        (default 85.0)
+  rotate_in_place_angle_deg stop forward motion and rotate in place
+                            when heading error is too large           (default 25.0)
   require_marker            when false, coarse arrival completes the waypoint
                             directly for bench / wheel-spin tests     (default true)
   emit_journey_events       publish key progress events on /journey/event
@@ -131,6 +136,8 @@ class PathFollowerNode(Node):
         self.declare_parameter('k_linear',                0.4)
         self.declare_parameter('control_rate_hz',        10.0)
         self.declare_parameter('local_target_timeout_s',  0.5)
+        self.declare_parameter('local_target_max_heading_deg', 85.0)
+        self.declare_parameter('rotate_in_place_angle_deg', 25.0)
         self.declare_parameter('require_marker',         True)
         self.declare_parameter('emit_journey_events',    False)
 
@@ -153,6 +160,12 @@ class PathFollowerNode(Node):
         self._k_lin               = _dbl('k_linear')
         rate_hz                   = _dbl('control_rate_hz')
         self._local_target_timeout = _dbl('local_target_timeout_s')
+        self._local_target_max_heading = math.radians(
+            _dbl('local_target_max_heading_deg')
+        )
+        self._rotate_in_place_angle = math.radians(
+            _dbl('rotate_in_place_angle_deg')
+        )
         self._require_marker      = _bool('require_marker')
         self._emit_journey_events = _bool('emit_journey_events')
 
@@ -207,6 +220,8 @@ class PathFollowerNode(Node):
         self._mission_hold:     bool = False
         self._pending_advance:  bool = False
 
+        self._estop: bool = False
+
         # ---- QoS ---------------------------------------------------------
         latched_qos = QoSProfile(
             depth=1,
@@ -228,6 +243,7 @@ class PathFollowerNode(Node):
         self.create_subscription(PoseStamped, '/mission/home_pose', self._home_cb,        latched_qos)
         self.create_subscription(PoseStamped, '/local_target',      self._local_target_cb, 10)
         self.create_subscription(Bool,        '/mission/hold',      self._hold_cb,        latched_qos)
+        self.create_subscription(Bool,        '/emergency_stop',    self._estop_cb,       latched_qos)
 
         # ---- Control loop ------------------------------------------------
         self._timer = self.create_timer(1.0 / rate_hz, self._tick)
@@ -296,6 +312,11 @@ class PathFollowerNode(Node):
             self.get_logger().info('PathFollower: mission hold released — advancing waypoint')
             self._advance_waypoint()
 
+    def _estop_cb(self, msg: Bool) -> None:
+        self._estop = msg.data
+        if self._estop:
+            self._stop_robot()
+
     # ------------------------------------------------------------------
     # Mission start — called once when AUTO mode is first activated
     # ------------------------------------------------------------------
@@ -339,6 +360,9 @@ class PathFollowerNode(Node):
 
     def _tick(self) -> None:
         if self._mode != 'AUTO':
+            return
+
+        if self._estop:
             return
 
         if self._state in (State.IDLE, State.DONE):
@@ -385,7 +409,10 @@ class PathFollowerNode(Node):
             self._local_target_time > 0.0
             and (now - self._local_target_time) <= self._local_target_timeout
         )
-        if local_fresh:
+        if local_fresh and self._is_target_in_forward_sector(
+            self._local_target_x,
+            self._local_target_y,
+        ):
             self._drive_toward(self._local_target_x, self._local_target_y)
         else:
             self._drive_toward(self._target_x, self._target_y)
@@ -454,6 +481,9 @@ class PathFollowerNode(Node):
     # ------------------------------------------------------------------
 
     def _set_target_to_wp(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._waypoints):
+            self.get_logger().error(f'PathFollower: waypoint index {idx} out of range')
+            return
         wp = self._waypoints[idx]
         self._target_x = wp.x
         self._target_y = wp.y
@@ -489,18 +519,22 @@ class PathFollowerNode(Node):
         dy = ty - self._robot_y
         dist = math.hypot(dx, dy)
 
-        desired_heading = math.atan2(dy, dx)
-        heading_err     = _angle_wrap(desired_heading - self._robot_yaw)
+        heading_err = self._heading_error_to(tx, ty)
 
         angular_vel = _clamp(self._k_ang * heading_err, -self._max_ang, self._max_ang)
 
-        # Scale down linear speed when turning sharply (cos² factor)
-        forward_factor = math.cos(heading_err) ** 2
-        linear_vel = _clamp(
-            self._k_lin * dist * forward_factor,
-            0.0,
-            self._max_lin,
-        )
+        if abs(heading_err) >= self._rotate_in_place_angle:
+            linear_vel = 0.0
+        else:
+            # Do not drive forward toward targets behind the robot.
+            # For targets within the forward hemisphere, keep the original cos²
+            # shaping so speed still tapers smoothly near large heading errors.
+            forward_factor = max(0.0, math.cos(heading_err)) ** 2
+            linear_vel = _clamp(
+                self._k_lin * dist * forward_factor,
+                0.0,
+                self._max_lin,
+            )
 
         cmd = Twist()
         cmd.linear.x  = float(linear_vel)
@@ -509,6 +543,22 @@ class PathFollowerNode(Node):
 
     def _stop_robot(self) -> None:
         self._pub_cmd.publish(Twist())
+
+    def _heading_error_to(self, tx: float, ty: float) -> float:
+        """Return wrapped heading error from robot pose to target point."""
+        dx = tx - self._robot_x
+        dy = ty - self._robot_y
+        desired_heading = math.atan2(dy, dx)
+        return _angle_wrap(desired_heading - self._robot_yaw)
+
+    def _is_target_in_forward_sector(self, tx: float, ty: float) -> bool:
+        """
+        Accept local targets only when they stay within the configured forward
+        sector. This prevents LiDAR planners from sending the robot into
+        oscillations with rear-hemisphere targets while the global waypoint is
+        actually ahead.
+        """
+        return abs(self._heading_error_to(tx, ty)) <= self._local_target_max_heading
 
     # ------------------------------------------------------------------
     # State / publish helpers

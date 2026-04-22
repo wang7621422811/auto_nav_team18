@@ -41,6 +41,9 @@ Parameters (weave_planner section in lidar.yaml):
   gap_min_width_rad         same as GapPlanner             (default 0.30)
   corridor_half_width_m     half-width of the weave corridor in m (default 2.0)
   lookahead_m               lookahead distance for target   (default 1.2)
+  goal_clear_window_deg     angular window checked around waypoint (default 12.0)
+  goal_clear_min_fraction   minimum free-ray fraction to drive
+                            directly toward waypoint        (default 0.8)
   w_goal                    weight — goal alignment         (default 3.0)
   w_clearance               weight — gap openness           (default 1.5)
   w_progress                weight — forward bias           (default 1.0)
@@ -93,6 +96,8 @@ class WeavePlannerNode(Node):
         self.declare_parameter('gap_min_width_rad',    0.30)
         self.declare_parameter('corridor_half_width_m', 2.0)
         self.declare_parameter('lookahead_m',          1.2)
+        self.declare_parameter('goal_clear_window_deg', 12.0)
+        self.declare_parameter('goal_clear_min_fraction', 0.8)
         self.declare_parameter('w_goal',      3.0)
         self.declare_parameter('w_clearance', 1.5)
         self.declare_parameter('w_progress',  1.0)
@@ -106,6 +111,8 @@ class WeavePlannerNode(Node):
         self._min_width_rad    = _dbl('gap_min_width_rad')
         self._corridor_half_w  = _dbl('corridor_half_width_m')
         self._lookahead        = _dbl('lookahead_m')
+        self._goal_clear_half_rad = math.radians(_dbl('goal_clear_window_deg') * 0.5)
+        self._goal_clear_min_fraction = _dbl('goal_clear_min_fraction')
         self._w_goal           = _dbl('w_goal')
         self._w_clearance      = _dbl('w_clearance')
         self._w_progress       = _dbl('w_progress')
@@ -209,6 +216,13 @@ class WeavePlannerNode(Node):
         if not self._active:
             return
 
+        goal_range = self._goal_direction_range(msg)
+        if goal_range is not None:
+            goal_angle = self._angle_to_waypoint()
+            self._prev_gap_angle = goal_angle
+            self._publish_local_target(goal_angle, goal_range)
+            return
+
         gaps = self._find_gaps(msg)
         if not gaps:
             return
@@ -218,7 +232,10 @@ class WeavePlannerNode(Node):
             return
 
         self._prev_gap_angle = best.center_angle
-        self._publish_local_target(best.center_angle, best.mean_range)
+        self._publish_local_target(
+            self._guided_gap_angle(best),
+            best.mean_range,
+        )
 
     # ------------------------------------------------------------------
     # Gap finding (shared with GapPlanner)
@@ -319,6 +336,16 @@ class WeavePlannerNode(Node):
     # Target publishing
     # ------------------------------------------------------------------
 
+    def _guided_gap_angle(self, gap: Gap) -> float:
+        """
+        Keep the local target inside the chosen gap, but bias it toward the
+        actual waypoint bearing instead of blindly using the gap centre.
+        """
+        half_width = gap.width_rad * 0.5
+        min_angle = gap.center_angle - half_width
+        max_angle = gap.center_angle + half_width
+        return _clamp(self._angle_to_waypoint(), min_angle, max_angle)
+
     def _publish_local_target(self, gap_angle: float, gap_range: float) -> None:
         dist = min(self._lookahead, gap_range * 0.9)
 
@@ -352,6 +379,44 @@ class WeavePlannerNode(Node):
         dx = self._wp_x - self._robot_x
         dy = self._wp_y - self._robot_y
         return _angle_wrap(math.atan2(dy, dx) - self._robot_yaw)
+
+    def _goal_direction_range(self, scan: LaserScan) -> float | None:
+        """Return a direct-drive range when the waypoint bearing is mostly clear."""
+        if self._wp_x is None or self._wp_y is None:
+            return None
+
+        goal_angle = self._angle_to_waypoint()
+        if goal_angle < scan.angle_min or goal_angle > scan.angle_max:
+            return None
+
+        free_ranges: List[float] = []
+        considered = 0
+        free = 0
+        for idx, raw_range in enumerate(scan.ranges):
+            angle = scan.angle_min + idx * scan.angle_increment
+            if abs(_angle_wrap(angle - goal_angle)) > self._goal_clear_half_rad:
+                continue
+
+            considered += 1
+            if math.isinf(raw_range) or math.isnan(raw_range):
+                r_use = scan.range_max
+            else:
+                r_use = raw_range
+
+            if r_use > self._min_clearance and r_use <= scan.range_max:
+                free += 1
+                free_ranges.append(r_use)
+
+        if considered == 0:
+            return None
+
+        if (free / considered) < self._goal_clear_min_fraction:
+            return None
+
+        if not free_ranges:
+            return None
+
+        return min(free_ranges)
 
 
 # ---------------------------------------------------------------------------
@@ -420,6 +485,10 @@ def _angle_wrap(a: float) -> float:
     while a >  math.pi: a -= 2.0 * math.pi
     while a < -math.pi: a += 2.0 * math.pi
     return a
+
+
+def _clamp(val: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, val))
 
 
 # ---------------------------------------------------------------------------

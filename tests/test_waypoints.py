@@ -204,6 +204,8 @@ def _make_follower(wp_file: str, **param_overrides) -> PathFollowerNode:
         'k_angular':               1.5,
         'k_linear':                0.4,
         'control_rate_hz':        10.0,
+        'local_target_max_heading_deg': 85.0,
+        'rotate_in_place_angle_deg': 25.0,
         'require_marker':         True,
         'emit_journey_events':    False,
     }
@@ -218,6 +220,12 @@ def _make_follower(wp_file: str, **param_overrides) -> PathFollowerNode:
     node._max_ang     = defaults['max_angular_vel']
     node._k_ang       = defaults['k_angular']
     node._k_lin       = defaults['k_linear']
+    node._local_target_max_heading = math.radians(
+        defaults['local_target_max_heading_deg']
+    )
+    node._rotate_in_place_angle = math.radians(
+        defaults['rotate_in_place_angle_deg']
+    )
     node._require_marker = defaults['require_marker']
     node._emit_journey_events = defaults['emit_journey_events']
 
@@ -245,6 +253,7 @@ def _make_follower(wp_file: str, **param_overrides) -> PathFollowerNode:
     node._marker_y      = None
     node._target_x      = 0.0
     node._target_y      = 0.0
+    node._estop         = False
 
     node._pub_cmd     = MagicMock()
     node._pub_wp      = MagicMock()
@@ -708,6 +717,52 @@ class TestPathFollowerNavigation(unittest.TestCase):
         node._robot_y  = 0.3
         node._tick()
         self.assertEqual(node._state, State.DONE)
+
+    def test_rear_local_target_falls_back_to_waypoint(self):
+        """Rear local targets must not override the forward global waypoint."""
+        node = _make_follower(self._wp_file)
+        node._mode_cb(_String(data='AUTO'))
+        node._robot_x = 0.0
+        node._robot_y = 0.0
+        node._robot_yaw = 0.0
+        node._target_x = 10.0
+        node._target_y = 0.0
+        node._local_target_x = -2.0
+        node._local_target_y = 0.0
+        node._local_target_time = 0.05
+        node.get_clock().now.return_value.nanoseconds = int(0.1 * 1e9)
+
+        node._tick()
+
+        cmd = node._pub_cmd.publish.call_args[0][0]
+        self.assertGreater(cmd.linear.x, 0.0)
+        self.assertAlmostEqual(cmd.angular.z, 0.0, places=6)
+
+    def test_drive_toward_rear_target_turns_in_place(self):
+        """Targets behind the robot should not command positive forward speed."""
+        node = _make_follower(self._wp_file)
+        node._robot_x = 0.0
+        node._robot_y = 0.0
+        node._robot_yaw = 0.0
+
+        node._drive_toward(-1.0, 0.0)
+
+        cmd = node._pub_cmd.publish.call_args[0][0]
+        self.assertAlmostEqual(cmd.linear.x, 0.0, places=6)
+        self.assertAlmostEqual(abs(cmd.angular.z), node._max_ang, places=6)
+
+    def test_large_heading_error_rotates_in_place(self):
+        """Large heading errors should stop forward motion until aligned."""
+        node = _make_follower(self._wp_file)
+        node._robot_x = 0.0
+        node._robot_y = 0.0
+        node._robot_yaw = 0.0
+
+        node._drive_toward(0.0, 10.0)   # 90° heading error
+
+        cmd = node._pub_cmd.publish.call_args[0][0]
+        self.assertAlmostEqual(cmd.linear.x, 0.0, places=6)
+        self.assertAlmostEqual(cmd.angular.z, node._max_ang, places=6)
 
     def test_bench_mode_emits_journey_events(self):
         node = _make_follower(

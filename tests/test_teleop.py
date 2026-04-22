@@ -175,14 +175,18 @@ def _make_cmd_gate():
 
 def _make_gamepad_watchdog(
     axis_deadman=5,
+    deadman_axis_secondary=-1,
     deadman_button=-1,
     threshold=0.5,
+    deadman_axis_pressed_high=True,
 ):
     node = GamepadWatchdogNode.__new__(GamepadWatchdogNode)
     node._logger = MagicMock()
     node._axis_deadman = axis_deadman
+    node._deadman_axis_secondary = deadman_axis_secondary
     node._deadman_button = deadman_button
     node._deadman_threshold = threshold
+    node._deadman_axis_pressed_high = deadman_axis_pressed_high
     node._connected = False
     node._deadman_ok = False
     node._pub_connected = MagicMock()
@@ -291,6 +295,34 @@ class TestGamepadWatchdog(unittest.TestCase):
         node = _make_gamepad_watchdog(axis_deadman=5, deadman_button=0)
         buttons = [1] + [0] * 11
         GamepadWatchdogNode._joy_cb(node, _make_joy(buttons=buttons, axes=[0.0] * 8))
+        last = node._pub_deadman.publish.call_args[0][0]
+        self.assertTrue(last.data)
+
+    def test_deadman_axis_pressed_low_mapping(self):
+        node = _make_gamepad_watchdog(
+            axis_deadman=5,
+            deadman_button=-1,
+            threshold=0.0,
+            deadman_axis_pressed_high=False,
+        )
+        axes = [1.0] * 8
+        axes[5] = -1.0
+        GamepadWatchdogNode._joy_cb(node, _make_joy(axes=axes))
+        last = node._pub_deadman.publish.call_args[0][0]
+        self.assertTrue(last.data)
+
+    def test_deadman_secondary_axis_pressed_low_mapping(self):
+        node = _make_gamepad_watchdog(
+            axis_deadman=5,
+            deadman_axis_secondary=4,
+            deadman_button=-1,
+            threshold=0.0,
+            deadman_axis_pressed_high=False,
+        )
+        axes = [1.0] * 8
+        axes[4] = -1.0
+        axes[5] = 1.0
+        GamepadWatchdogNode._joy_cb(node, _make_joy(axes=axes))
         last = node._pub_deadman.publish.call_args[0][0]
         self.assertTrue(last.data)
 
@@ -406,6 +438,7 @@ class TestCmdGate(unittest.TestCase):
     def test_estop_allows_manual_reverse_escape(self):
         node = _make_cmd_gate()
         node._mode  = CmdGateNode.MANUAL
+        node._deadman_ok = True
         node._estop = True
         manual_cmd  = _Twist()
         manual_cmd.linear.x = -0.4

@@ -22,6 +22,7 @@ import rclpy
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Imu, NavSatFix
 from std_msgs.msg import String
 from tf2_ros import TransformBroadcaster
@@ -110,13 +111,22 @@ class OutdoorPoseFuserNode(Node):
 
         self._state = NavState.WAITING_FOR_FIX
 
+        # Transient-local status keeps the latest state available to late
+        # subscribers, while the heartbeat helps default volatile CLI echo
+        # subscribers observe the current state during field debugging.
+        status_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
         self._pub_odom = self.create_publisher(Odometry, self._odom_out_topic, 10)
-        self._pub_status = self.create_publisher(String, self._status_topic, 10)
+        self._pub_status = self.create_publisher(String, self._status_topic, status_qos)
         self._tf_pub = TransformBroadcaster(self) if self._publish_tf else None
 
         self.create_subscription(Odometry, self._odom_in_topic, self._odom_cb, 10)
         self.create_subscription(Imu, self._imu_topic, self._imu_cb, 10)
         self.create_subscription(NavSatFix, self._gps_fix_topic, self._fix_cb, 10)
+        self._status_timer = self.create_timer(1.0, self._status_tick)
 
         self._publish_status()
         self.get_logger().info(
@@ -318,6 +328,10 @@ class OutdoorPoseFuserNode(Node):
         msg = String()
         msg.data = str(self._state.value)
         self._pub_status.publish(msg)
+
+    def _status_tick(self) -> None:
+        """Re-publish the latest state for default CLI subscribers."""
+        self._publish_status()
 
     def _now_s(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9

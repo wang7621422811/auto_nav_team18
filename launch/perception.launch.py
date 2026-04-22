@@ -102,6 +102,8 @@ def generate_launch_description() -> LaunchDescription:
         sim_time_arg,
         photo_dir_arg,
         LogInfo(msg="[perception.launch] Starting Step-4 perception nodes…"),
+        LogInfo(msg="[perception.launch] Camera driver is NOT started here; "
+                    "requires /camera/color/image_raw and /camera/depth/image_raw from bringup.launch.py or another publisher."),
         cone_detector_node,
         object_detector_node,
         distance_estimator_node,

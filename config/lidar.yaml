@@ -29,6 +29,8 @@ obstacle_guard:
     whitelist_radius_m: 0.7     # exclusion radius around target cone in FINAL_APPROACH (m)
     estop_cooldown_s:   0.3     # keep estop=True for this many seconds after trigger
     guard_rate_hz:      10.0    # watchdog publish rate
+    scan_min_range_m:   0.25    # ignore returns closer than this (robot own-body blind zone)
+    min_hit_rays:       3       # require a small contiguous obstacle cluster, not a 1-ray spike
 
 # =============================================================================
 # GapPlannerNode parameters
@@ -38,6 +40,8 @@ gap_planner:
     gap_min_clearance_m: 0.8    # range below this = obstacle (m)
     gap_min_width_rad:   0.30   # minimum angular gap width to be passable (rad, ~17°)
     lookahead_m:         1.5    # local target projection distance (m)
+    goal_clear_window_deg:   12.0   # if waypoint bearing is mostly clear in this window, drive directly toward it
+    goal_clear_min_fraction: 0.8    # required free-ray fraction in the waypoint window
     w_goal:      3.0            # weight: alignment with waypoint direction
     w_clearance: 1.5            # weight: gap openness
     w_progress:  1.0            # weight: forward progress (cos of angle)
@@ -54,6 +58,8 @@ weave_planner:
     gap_min_width_rad:      0.30
     corridor_half_width_m:  2.0   # half-width of the WP0→WP1 corridor (m)
     lookahead_m:            1.2   # slightly shorter lookahead for tighter manoeuvring
+    goal_clear_window_deg:   12.0
+    goal_clear_min_fraction: 0.8
     w_goal:      3.0
     w_clearance: 1.5
     w_progress:  1.0

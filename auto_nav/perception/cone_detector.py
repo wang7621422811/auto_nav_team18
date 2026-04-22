@@ -70,6 +70,7 @@ class ConeDetectorNode(Node):
 
         self._bridge        = CvBridge()
         self._depth_image   = None   # latest depth frame (np.ndarray float32 metres)
+        self._seen_color    = False
 
         best_effort = QoSProfile(
             depth=1,
@@ -86,6 +87,7 @@ class ConeDetectorNode(Node):
         self._pub_pose = self.create_publisher(PoseStamped, "/marker/detection", 10)
         # publish msg for the object detector
         self._pub_bbox = self.create_publisher(String,       "/marker/bbox",      10)
+        self._diag_timer = self.create_timer(5.0, self._diag_tick)
 
         self.get_logger().info("ConeDetectorNode ready — orange HSV "
                                f"H:[{self._p['h_low']},{self._p['h_high']}]")
@@ -117,6 +119,7 @@ class ConeDetectorNode(Node):
 
     # ------------------------------------------------------------------
     def _on_color(self, msg: Image) -> None:
+        self._seen_color = True
         try:
             bgr = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as exc:  # noqa: BLE001
@@ -129,6 +132,18 @@ class ConeDetectorNode(Node):
 
         cx, cy, w, h, rng, bearing = detection
         self._publish(msg.header, cx, cy, w, h, rng, bearing)
+
+    # ------------------------------------------------------------------
+    def _diag_tick(self) -> None:
+        """Warn when the detector is alive but no color frames are arriving."""
+        if self._seen_color:
+            return
+        self.get_logger().warn(
+            "No frames received on /camera/color/image_raw yet. "
+            "perception.launch.py does not start the camera driver; "
+            "launch bringup.launch.py with use_camera:=true or publish the topic externally.",
+            throttle_duration_sec=10.0,
+        )
 
     # ------------------------------------------------------------------
     def _detect_cone(self, bgr: np.ndarray):

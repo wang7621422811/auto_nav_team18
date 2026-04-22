@@ -13,11 +13,11 @@ outdoor_pose_fuser:
     publish_tf: true
 
     # Shared ENU origin for live GPS fixes.
-    gps_origin_lat: 51.4788
-    gps_origin_lon: -0.0106
+    gps_origin_lat: -31.980532
+    gps_origin_lon: 115.817370
 
     # Lightweight GPS / odom fusion tuning.
-    gps_position_alpha: 0.1
+    gps_position_alpha: 0.05
     gps_jump_reject_m: 8.0
     fix_timeout_s: 2.0
     use_imu_yaw: true

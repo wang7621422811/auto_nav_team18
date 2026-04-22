@@ -193,6 +193,8 @@ def _make_gap_node():
     node._min_clearance = 0.8
     node._min_width_rad = 0.30
     node._lookahead     = 1.5
+    node._goal_clear_half_rad = math.radians(6.0)
+    node._goal_clear_min_fraction = 0.8
     node._w_goal        = 3.0
     node._w_clearance   = 1.5
     node._w_progress    = 1.0
@@ -213,6 +215,8 @@ def _make_obs_node():
     node._front_half_rad = math.radians(60.0)   # ±60° (120° total)
     node._whitelist_r    = 0.7
     node._cooldown       = 0.3
+    node._scan_min_range = 0.0
+    node._min_hit_rays   = 1
     node._estop          = False
     node._last_trigger_time = None
     node._robot_x   = 0.0
@@ -322,6 +326,52 @@ class TestGapScoring(unittest.TestCase):
         result = self.node._score_and_pick([], scan)
         self.assertIsNone(result)
 
+    def test_guided_gap_angle_biases_toward_waypoint_inside_gap(self):
+        """When the chosen gap already contains the waypoint bearing, follow that bearing."""
+        from auto_nav.navigation.gap_planner import Gap
+        self.node._wp_x = 0.0
+        self.node._wp_y = 5.0   # waypoint at +90° in robot frame
+        gap = Gap(center_angle=0.0, width_rad=math.pi, mean_range=5.0, score=0.0)
+
+        guided = self.node._guided_gap_angle(gap)
+
+        self.assertAlmostEqual(guided, math.pi / 2, places=6)
+
+    def test_guided_gap_angle_clamps_to_gap_edge(self):
+        """When waypoint bearing lies outside the gap, clamp to nearest valid edge."""
+        from auto_nav.navigation.gap_planner import Gap
+        self.node._wp_x = 0.0
+        self.node._wp_y = 5.0   # waypoint at +90°
+        gap = Gap(center_angle=0.0, width_rad=math.radians(40.0), mean_range=5.0, score=0.0)
+
+        guided = self.node._guided_gap_angle(gap)
+
+        self.assertAlmostEqual(guided, math.radians(20.0), places=6)
+
+    def test_goal_direction_range_accepts_clear_waypoint_bearing(self):
+        """If waypoint window is clear enough, prefer direct waypoint tracking."""
+        scan = _make_scan([5.0] * 181)
+        self.node._wp_x = 0.0
+        self.node._wp_y = 5.0
+
+        goal_range = self.node._goal_direction_range(scan)
+
+        self.assertIsNotNone(goal_range)
+        self.assertGreater(goal_range, self.node._lookahead)
+
+    def test_goal_direction_range_rejects_blocked_waypoint_bearing(self):
+        """Blocked waypoint bearing must fall back to gap competition."""
+        ranges = [5.0] * 181
+        for i in range(174, 181):
+            ranges[i] = 0.2
+        scan = _make_scan(ranges)
+        self.node._wp_x = 0.0
+        self.node._wp_y = 5.0
+
+        goal_range = self.node._goal_direction_range(scan)
+
+        self.assertIsNone(goal_range)
+
 
 # ===========================================================================
 # Tests: ObstacleGuardNode safety check
@@ -341,7 +391,9 @@ class TestObstacleGuard(unittest.TestCase):
     def test_close_obstacle_front_triggers_estop(self):
         """Obstacle at 0.3 m straight ahead → emergency stop."""
         ranges = [5.0] * 181
+        ranges[89] = 0.3
         ranges[90] = 0.3   # centre ray = 0° = straight ahead
+        ranges[91] = 0.3
         scan = _make_scan(ranges)
         result = self.node._check_scan(scan)
         self.assertTrue(result)
@@ -397,6 +449,37 @@ class TestObstacleGuard(unittest.TestCase):
         scan = _make_scan(ranges)
         result = self.node._check_scan(scan)
         self.assertTrue(result)
+
+    def test_single_hit_spike_does_not_trigger_when_min_hit_rays_is_three(self):
+        """A 1-ray spike should be treated as noise when clustering is enabled."""
+        self.node._min_hit_rays = 3
+        ranges = [5.0] * 181
+        ranges[90] = 0.3
+        scan = _make_scan(ranges)
+        result = self.node._check_scan(scan)
+        self.assertFalse(result)
+
+    def test_three_adjacent_hits_trigger_when_min_hit_rays_is_three(self):
+        """A contiguous obstacle cluster must still trigger emergency stop."""
+        self.node._min_hit_rays = 3
+        ranges = [5.0] * 181
+        ranges[89] = 0.3
+        ranges[90] = 0.2
+        ranges[91] = 0.3
+        scan = _make_scan(ranges)
+        result = self.node._check_scan(scan)
+        self.assertTrue(result)
+
+    def test_scan_min_range_filters_ultra_close_spike(self):
+        """Returns inside the blind zone should be ignored before clustering."""
+        self.node._scan_min_range = 0.25
+        ranges = [5.0] * 181
+        ranges[89] = 0.05
+        ranges[90] = 0.05
+        ranges[91] = 0.05
+        scan = _make_scan(ranges, range_min=0.05)
+        result = self.node._check_scan(scan)
+        self.assertFalse(result)
 
 
 # ===========================================================================
@@ -509,6 +592,8 @@ class TestWeavePlannerCorridorPenalty(unittest.TestCase):
         node._min_width_rad   = 0.30
         node._corridor_half_w = corridor_half_w
         node._lookahead       = 1.2
+        node._goal_clear_half_rad = math.radians(6.0)
+        node._goal_clear_min_fraction = 0.8
         node._w_goal          = 3.0
         node._w_clearance     = 1.5
         node._w_progress      = 1.0
@@ -553,6 +638,28 @@ class TestWeavePlannerCorridorPenalty(unittest.TestCase):
         node._corridor_end   = None
         penalty = node._corridor_penalty(0.0, 3.0)
         self.assertAlmostEqual(penalty, 0.0)
+
+    def test_guided_gap_angle_biases_toward_waypoint_inside_gap(self):
+        node = self._make_weave_node()
+        from auto_nav.navigation.weave_planner import Gap
+
+        node._wp_x = 3.0
+        node._wp_y = 3.0   # waypoint at +45° in robot frame
+        gap = Gap(center_angle=0.0, width_rad=math.pi, mean_range=5.0, score=0.0)
+
+        guided = node._guided_gap_angle(gap)
+
+        self.assertAlmostEqual(guided, math.pi / 4, places=6)
+
+    def test_goal_direction_range_accepts_clear_waypoint_bearing(self):
+        node = self._make_weave_node()
+        scan = _make_scan([5.0] * 181)
+        node._wp_x = 0.0
+        node._wp_y = 5.0
+
+        goal_range = node._goal_direction_range(scan)
+
+        self.assertIsNotNone(goal_range)
 
 
 # ===========================================================================

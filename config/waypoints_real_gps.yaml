@@ -6,46 +6,46 @@
 # system.
 
 origin:
-  lat: 51.4788
-  lon: -0.0106
+  lat: -31.980532
+  lon: 115.817370
 
 waypoints:
   - name: wp1
     type: gps
-    lat: -31.980512
-    lon: 115.817364
+    lat: -31.9803568
+    lon: 115.8174252
 
-  - name: wp2
-    type: gps
-    lat: -31.980408
-    lon: 115.817671
+  # - name: wp2
+  #   type: gps
+  #   lat: -31.980408
+  #   lon: 115.817671
 
-  - name: wp3
-    type: gps
-    lat: -31.980291
-    lon: 115.817763
+  # - name: wp3
+  #   type: gps
+  #   lat: -31.980291
+  #   lon: 115.817763
 
-  - name: wp4
-    type: gps
-    lat: -31.980207
-    lon: 115.817681
+  # - name: wp4
+  #   type: gps
+  #   lat: -31.980207
+  #   lon: 115.817681
 
-  - name: wp5
-    type: gps
-    lat: -31.980197
-    lon: 115.817678
+  # - name: wp5
+  #   type: gps
+  #   lat: -31.980197
+  #   lon: 115.817678
 
-  - name: wp6
-    type: gps
-    lat: -31.979961
-    lon: 115.817545
+  # - name: wp6
+  #   type: gps
+  #   lat: -31.979961
+  #   lon: 115.817545
 
-  - name: wp7
-    type: gps
-    lat: -31.980168
-    lon: 115.817341
+  # - name: wp7
+  #   type: gps
+  #   lat: -31.980168
+  #   lon: 115.817341
 
-  - name: wp8
-    type: gps
-    lat: -31.980512
-    lon: 115.817347
+  # - name: wp8
+  #   type: gps
+  #   lat: -31.980512
+  #   lon: 115.817347

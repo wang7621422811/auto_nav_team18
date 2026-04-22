@@ -9,11 +9,8 @@
 
 path_follower:
   ros__parameters:
-    # Path to the plain-YAML waypoints data file (set by navigation.launch.py)
-    waypoints_file: ""
-
     # Arrival thresholds
-    coarse_arrival_radius_m: 2.5   # switch to "waiting for marker" inside this radius
+    coarse_arrival_radius_m: 3.0   # switch to "waiting for marker" inside this radius
     final_arrival_radius_m:  1.0   # waypoint considered complete inside this radius
     home_arrival_radius_m:   1.0   # home considered reached inside this radius
 
@@ -25,13 +22,14 @@ path_follower:
     max_angular_vel: 1.0   # rad/s
 
     # Proportional controller gains
-    k_angular: 1.5   # angular velocity = k_angular × heading_error
+    k_angular: 0.8   # angular velocity = k_angular × heading_error
     k_linear:  0.4   # linear  velocity = k_linear  × distance  (reduced by cos²)
 
     # Control loop rate
     control_rate_hz: 10.0
 
-weave_planner:
-  ros__parameters:
-    # Path to the plain-YAML waypoints data file (set by navigation.launch.py)
-    waypoints_file: ""
+    # Local target handoff from LiDAR planners
+    local_target_timeout_s: 0.5
+    local_target_max_heading_deg: 85.0   # ignore /local_target if it points behind the robot
+    rotate_in_place_angle_deg: 35.0      # do not drive forward until roughly aligned with target
+

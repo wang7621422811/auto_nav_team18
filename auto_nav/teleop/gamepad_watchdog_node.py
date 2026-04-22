@@ -21,18 +21,26 @@ class GamepadWatchdogNode(Node):
 
         # Parameters from joystick.yaml (all have safe defaults)
         self.declare_parameter('axis_deadman', 5)
+        self.declare_parameter('deadman_axis_secondary', -1)
         self.declare_parameter('deadman_button', -1)
         self.declare_parameter('deadman_threshold', 0.5)
+        self.declare_parameter('deadman_axis_pressed_high', True)
         self.declare_parameter('joy_timeout_sec', 1.0)
 
         self._axis_deadman: int = (
             self.get_parameter('axis_deadman').get_parameter_value().integer_value
+        )
+        self._deadman_axis_secondary: int = (
+            self.get_parameter('deadman_axis_secondary').get_parameter_value().integer_value
         )
         self._deadman_button: int = (
             self.get_parameter('deadman_button').get_parameter_value().integer_value
         )
         self._deadman_threshold: float = (
             self.get_parameter('deadman_threshold').get_parameter_value().double_value
+        )
+        self._deadman_axis_pressed_high: bool = (
+            self.get_parameter('deadman_axis_pressed_high').get_parameter_value().bool_value
         )
         self._timeout: float = (
             self.get_parameter('joy_timeout_sec').get_parameter_value().double_value
@@ -61,7 +69,11 @@ class GamepadWatchdogNode(Node):
         dm_info = (
             f'deadman_button={self._deadman_button}'
             if self._deadman_button >= 0
-            else f'deadman axis={self._axis_deadman}'
+            else (
+                f'deadman axis={self._axis_deadman}'
+                f'{f"/{self._deadman_axis_secondary}" if self._deadman_axis_secondary >= 0 else ""} '
+                f'({"high" if self._deadman_axis_pressed_high else "low"}-when-pressed)'
+            )
         )
         self.get_logger().info(
             f'GamepadWatchdog ready — timeout={self._timeout}s, '
@@ -82,8 +94,23 @@ class GamepadWatchdogNode(Node):
         if self._deadman_button >= 0:
             if self._deadman_button < len(msg.buttons):
                 deadman_active = bool(msg.buttons[self._deadman_button])
-        elif 0 <= self._axis_deadman < len(msg.axes):
-            deadman_active = msg.axes[self._axis_deadman] > self._deadman_threshold
+        else:
+            axis_indices = [self._axis_deadman]
+            if self._deadman_axis_secondary >= 0:
+                axis_indices.append(self._deadman_axis_secondary)
+
+            for axis_idx in axis_indices:
+                if not (0 <= axis_idx < len(msg.axes)):
+                    continue
+                axis_value = msg.axes[axis_idx]
+                if self._deadman_axis_pressed_high:
+                    if axis_value > self._deadman_threshold:
+                        deadman_active = True
+                        break
+                else:
+                    if axis_value < self._deadman_threshold:
+                        deadman_active = True
+                        break
 
         if deadman_active != self._deadman_ok:
             self._deadman_ok = deadman_active

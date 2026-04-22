@@ -193,7 +193,7 @@ def test_bringup_launch_includes_odom_tf_broadcaster_without_gps() -> None:
 
 
 def test_bringup_launch_uses_local_oakd_camera_node() -> None:
-    module = _load_bringup_launch_module()
+    module = _load_launch_module('bringup.launch.py')
     launch_description = module.generate_launch_description()
 
     camera_op = next(
@@ -220,6 +220,56 @@ def test_bringup_launch_uses_local_oakd_camera_node() -> None:
         isinstance(params, dict) and params.get('mx_id') == 'oak-test-id'
         for params in camera_node.parameters
     )
+
+
+def test_bringup_launch_skips_nmea_gps_driver_when_disabled() -> None:
+    module = _load_launch_module('bringup.launch.py')
+    launch_description = module.generate_launch_description()
+
+    gps_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_gps_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={'use_nmea_gps': 'false', 'use_sim_time': 'false'}
+    )
+    assert gps_op.function(context) == []
+
+
+def test_bringup_launch_can_start_nmea_gps_driver() -> None:
+    module = _load_launch_module('bringup.launch.py')
+    launch_description = module.generate_launch_description()
+
+    gps_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_gps_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={
+            'use_nmea_gps': 'true',
+            'gps_port': '/dev/ttyACM0',
+            'gps_baud': '9600',
+            'gps_frame_id': 'gps',
+            'use_sim_time': 'false',
+        }
+    )
+    nodes = gps_op.function(context)
+    assert len(nodes) == 1
+
+    gps_node = nodes[0]
+    assert gps_node.package == 'nmea_navsat_driver'
+    assert gps_node.executable == 'nmea_serial_driver'
+    assert gps_node.name == 'nmea_navsat_driver'
+    assert gps_node.parameters == [{
+        'port': '/dev/ttyACM0',
+        'baud': 9600,
+        'frame_id': 'gps',
+        'use_sim_time': False,
+    }]
 
 
 def test_bringup_launch_isolates_vendor_sick_tf_from_main_tree() -> None:
@@ -312,6 +362,31 @@ def test_navigation_launch_defaults_to_local_waypoints_without_gps() -> None:
         'waypoints_file': str(_ROOT / 'config' / 'waypoints_data.yaml'),
         'use_sim_time': False,
     } in path_param_overrides
+
+
+def test_navigation_launch_loads_robot_params_before_waypoint_params() -> None:
+    module = _load_launch_module('navigation.launch.py')
+    launch_description = module.generate_launch_description()
+
+    nav_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_navigation_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={
+            'use_gps': 'false',
+            'use_sim_time': 'false',
+            'waypoints_file': '',
+        }
+    )
+    nodes = nav_op.function(context)
+    by_name = {node.name: node for node in nodes}
+
+    path_params = by_name['path_follower'].parameters
+    assert str(_ROOT / 'config' / 'robot.yaml') == path_params[0]
+    assert str(_ROOT / 'config' / 'waypoints.yaml') == path_params[1]
 
 
 def test_mission_launch_remaps_controller_odom_in_gps_mode() -> None:

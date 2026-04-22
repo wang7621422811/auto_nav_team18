@@ -5,12 +5,13 @@ Launches (in order of dependency):
   1. ariaNode         — Pioneer 3-AT chassis driver  → /odom /cmd_vel
   2. odom_tf_broadcaster OR outdoor_pose_fuser
                        — Step-0 TF from /odom, or GPS-aligned /nav/odom + TF
-  3. sick_scan_xd OR lakibeam_ros2 — LiDAR driver      → /scan
-  4. oakd_camera                    — OAK-D V2 camera   → /camera/*   (optional)
-  5. joy_node                       — Bluetooth gamepad → /joy
-  6. static_transform_publisher ×2  — base_link→laser, base_link→camera_link
+  3. nmea_navsat_driver             — GPS serial driver → /fix          (optional)
+  4. sick_scan_xd OR lakibeam_ros2 — LiDAR driver      → /scan
+  5. oakd_camera                    — OAK-D V2 camera   → /camera/*   (optional)
+  6. joy_node                       — Bluetooth gamepad → /joy
+  7. static_transform_publisher ×2  — base_link→laser, base_link→camera_link
      (translation xyz read from config/robot.yaml at launch)
-  7. gamepad_watchdog               — /joy_connected /deadman_ok
+  8. gamepad_watchdog               — /joy_connected /deadman_ok
 
 NOT here (belongs in navigation.launch.py):
   home_pose_recorder  — moved to avoid duplicate when navigation.launch.py runs
@@ -24,6 +25,10 @@ CLI arguments (all have defaults; override on command line):
   camera_mx_id:=          (empty = auto)
   use_sim_time:=false
   use_gps:=false
+  use_nmea_gps:=false
+  gps_port:=/dev/ttyACM0
+  gps_baud:=9600
+  gps_frame_id:=gps
   aria_pkg:=ariaNode
   aria_exec:=ariaNode     (confirmed via `ros2 pkg executables ariaNode` on pioneer1)
 """
@@ -90,6 +95,22 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'use_gps', default_value='false',
             description='GPS outdoor mode: launch outdoor_pose_fuser instead of odom_tf_broadcaster',
+        ),
+        DeclareLaunchArgument(
+            'use_nmea_gps', default_value='false',
+            description='Launch nmea_navsat_driver for serial GPS fixes on /fix',
+        ),
+        DeclareLaunchArgument(
+            'gps_port', default_value='/dev/ttyACM0',
+            description='Serial device for the NMEA GPS receiver',
+        ),
+        DeclareLaunchArgument(
+            'gps_baud', default_value='9600',
+            description='Baud rate for the NMEA GPS receiver',
+        ),
+        DeclareLaunchArgument(
+            'gps_frame_id', default_value='gps',
+            description='frame_id published by nmea_navsat_driver',
         ),
         DeclareLaunchArgument(
             'joy_dev', default_value='/dev/input/js0',
@@ -320,6 +341,41 @@ def generate_launch_description() -> LaunchDescription:
             )
         ]
 
+    def _gps_nodes(context, *args, **kwargs):
+        """Optionally launch a serial NMEA GPS driver that publishes /fix."""
+        if context.launch_configurations.get('use_nmea_gps', 'false').lower() != 'true':
+            return []
+
+        gps_port = context.launch_configurations.get('gps_port', '/dev/ttyACM0').strip()
+        gps_baud_raw = context.launch_configurations.get('gps_baud', '9600').strip()
+        gps_frame_id = context.launch_configurations.get('gps_frame_id', 'gps').strip()
+        use_sim_time = context.launch_configurations.get('use_sim_time', 'false') == 'true'
+
+        try:
+            gps_baud = int(gps_baud_raw)
+        except ValueError as exc:
+            raise ValueError(f'[bringup] gps_baud must be an integer, got {gps_baud_raw!r}') from exc
+
+        LogInfo(
+            msg=f'[bringup] Starting NMEA GPS driver on {gps_port} @ {gps_baud} baud'
+        ).execute(context)
+        return [
+            Node(
+                package='nmea_navsat_driver',
+                executable='nmea_serial_driver',
+                name='nmea_navsat_driver',
+                output='screen',
+                parameters=[
+                    {
+                        'port': gps_port,
+                        'baud': gps_baud,
+                        'frame_id': gps_frame_id,
+                        'use_sim_time': use_sim_time,
+                    }
+                ],
+            )
+        ]
+
     def _gamepad_nodes(context, *args, **kwargs):
         """Resolve gamepad profile and create joy + watchdog nodes."""
         gamepad      = context.launch_configurations.get('gamepad', 'ps4')
@@ -360,6 +416,7 @@ def generate_launch_description() -> LaunchDescription:
             LogInfo(msg='=== auto_nav bringup: Step 0 ==='),
             aria_node,
             OpaqueFunction(function=_tf_nodes),
+            OpaqueFunction(function=_gps_nodes),
             OpaqueFunction(function=_lidar_nodes),
             OpaqueFunction(function=_camera_nodes),
             OpaqueFunction(function=_gamepad_nodes),

@@ -29,6 +29,8 @@ Parameters (obstacle_guard section in lidar.yaml):
   whitelist_radius_m       exclusion radius around the target cone     (default 0.7)
   estop_cooldown_s         seconds to hold estop=True after clear      (default 0.3)
   guard_rate_hz            watchdog publish rate                       (default 10.0)
+  scan_min_range_m         ignore ultra-close returns inside robot blind zone
+  min_hit_rays             require this many adjacent hit rays before estop
 """
 
 from __future__ import annotations
@@ -59,6 +61,8 @@ class ObstacleGuardNode(Node):
         self.declare_parameter('whitelist_radius_m', 0.7)
         self.declare_parameter('estop_cooldown_s',   0.3)
         self.declare_parameter('guard_rate_hz',      10.0)
+        self.declare_parameter('scan_min_range_m',   0.0)
+        self.declare_parameter('min_hit_rays',       1)
 
         def _dbl(n: str) -> float:
             return self.get_parameter(n).get_parameter_value().double_value
@@ -67,6 +71,11 @@ class ObstacleGuardNode(Node):
         self._front_half_rad = math.radians(_dbl('front_sector_deg') / 2.0)
         self._whitelist_r    = _dbl('whitelist_radius_m')
         self._cooldown       = _dbl('estop_cooldown_s')
+        self._scan_min_range = _dbl('scan_min_range_m')
+        self._min_hit_rays   = max(
+            1,
+            self.get_parameter('min_hit_rays').get_parameter_value().integer_value,
+        )
         rate_hz              = _dbl('guard_rate_hz')
 
         # ---- State -------------------------------------------------------
@@ -101,7 +110,9 @@ class ObstacleGuardNode(Node):
         self.get_logger().info(
             f'ObstacleGuard ready  safety_dist={self._safety_dist}m  '
             f'sector=±{math.degrees(self._front_half_rad):.0f}°  '
-            f'whitelist_r={self._whitelist_r}m'
+            f'whitelist_r={self._whitelist_r}m  '
+            f'scan_min={self._scan_min_range}m  '
+            f'min_hit_rays={self._min_hit_rays}'
         )
 
     # ------------------------------------------------------------------
@@ -161,32 +172,52 @@ class ObstacleGuardNode(Node):
         """
         in_final_approach = (self._wp_status == self._FINAL_APPROACH_STATE)
         whitelist_angle_half = self._compute_whitelist_angle() if in_final_approach else None
+        hit_count = 0
+        hit_min_r = math.inf
+        hit_angle = 0.0
 
         for i, r in enumerate(scan.ranges):
             if math.isinf(r) or math.isnan(r):
+                hit_count = 0
                 continue
             if r < scan.range_min or r > scan.range_max:
+                hit_count = 0
+                continue
+            if r < self._scan_min_range:
+                hit_count = 0
                 continue
 
             angle = scan.angle_min + i * scan.angle_increment
 
             # Only check the front sector
             if abs(angle) > self._front_half_rad:
+                hit_count = 0
                 continue
 
             # In final approach: skip rays pointing toward the target cone
             if whitelist_angle_half is not None:
                 cone_angle_robot, cone_half = whitelist_angle_half
                 if abs(_angle_wrap(angle - cone_angle_robot)) < cone_half:
+                    hit_count = 0
                     continue
 
             if r < self._safety_dist:
-                self.get_logger().warn(
-                    f'ObstacleGuard: obstacle at {r:.2f}m angle={math.degrees(angle):.1f}°  '
-                    f'(threshold={self._safety_dist}m)',
-                    throttle_duration_sec=1.0,
-                )
-                return True
+                hit_count += 1
+                if r < hit_min_r:
+                    hit_min_r = r
+                    hit_angle = angle
+                if hit_count >= self._min_hit_rays:
+                    self.get_logger().warn(
+                        f'ObstacleGuard: obstacle at {hit_min_r:.2f}m '
+                        f'angle={math.degrees(hit_angle):.1f}°  '
+                        f'(threshold={self._safety_dist}m, hits={hit_count})',
+                        throttle_duration_sec=1.0,
+                    )
+                    return True
+                continue
+
+            hit_count = 0
+            hit_min_r = math.inf
 
         return False
 

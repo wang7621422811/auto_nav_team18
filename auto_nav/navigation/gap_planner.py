@@ -26,6 +26,10 @@ Parameters (gap_planner section in lidar.yaml):
   gap_min_clearance_m   minimum range to treat a ray as "free"    (default 0.8)
   gap_min_width_rad     minimum angular width for a valid gap      (default 0.30)
   lookahead_m           lookahead distance for the target point    (default 1.5)
+  goal_clear_window_deg angular window checked around waypoint     (default 12.0)
+  goal_clear_min_fraction
+                        minimum free-ray fraction to drive directly
+                        toward waypoint                            (default 0.8)
   w_goal                weight — goal-direction alignment           (default 3.0)
   w_clearance           weight — gap openness                       (default 1.5)
   w_progress            weight — forward progress (cos angle)       (default 1.0)
@@ -71,6 +75,8 @@ class GapPlannerNode(Node):
         self.declare_parameter('gap_min_clearance_m', 0.8)
         self.declare_parameter('gap_min_width_rad',   0.30)
         self.declare_parameter('lookahead_m',         1.5)
+        self.declare_parameter('goal_clear_window_deg', 12.0)
+        self.declare_parameter('goal_clear_min_fraction', 0.8)
         self.declare_parameter('w_goal',      3.0)
         self.declare_parameter('w_clearance', 1.5)
         self.declare_parameter('w_progress',  1.0)
@@ -82,6 +88,8 @@ class GapPlannerNode(Node):
         self._min_clearance = _dbl('gap_min_clearance_m')
         self._min_width_rad = _dbl('gap_min_width_rad')
         self._lookahead     = _dbl('lookahead_m')
+        self._goal_clear_half_rad = math.radians(_dbl('goal_clear_window_deg') * 0.5)
+        self._goal_clear_min_fraction = _dbl('goal_clear_min_fraction')
         self._w_goal        = _dbl('w_goal')
         self._w_clearance   = _dbl('w_clearance')
         self._w_progress    = _dbl('w_progress')
@@ -137,6 +145,13 @@ class GapPlannerNode(Node):
 
     def _scan_cb(self, msg: LaserScan) -> None:
         """Main processing — runs on every new scan."""
+        goal_range = self._goal_direction_range(msg)
+        if goal_range is not None:
+            goal_angle = self._angle_to_waypoint()
+            self._prev_gap_angle = goal_angle
+            self._publish_local_target(goal_angle, goal_range)
+            return
+
         gaps = self._find_gaps(msg)
         if not gaps:
             return   # no gap found; path_follower falls back to direct driving
@@ -146,7 +161,10 @@ class GapPlannerNode(Node):
             return
 
         self._prev_gap_angle = best.center_angle
-        self._publish_local_target(best.center_angle, best.mean_range)
+        self._publish_local_target(
+            self._guided_gap_angle(best),
+            best.mean_range,
+        )
 
     # ------------------------------------------------------------------
     # Gap finding
@@ -256,6 +274,17 @@ class GapPlannerNode(Node):
     # Target publishing
     # ------------------------------------------------------------------
 
+    def _guided_gap_angle(self, gap: Gap) -> float:
+        """
+        Aim as close to the waypoint direction as possible while staying inside
+        the selected gap. This avoids the "all-clear scan => drive straight
+        ahead forever" failure mode in open outdoor areas.
+        """
+        half_width = gap.width_rad * 0.5
+        min_angle = gap.center_angle - half_width
+        max_angle = gap.center_angle + half_width
+        return _clamp(self._angle_to_waypoint(), min_angle, max_angle)
+
     def _publish_local_target(self, gap_angle: float, gap_range: float) -> None:
         """
         Project a point `lookahead_m` ahead along gap_angle in the robot frame,
@@ -295,6 +324,48 @@ class GapPlannerNode(Node):
         # Convert to robot frame
         return _angle_wrap(global_bearing - self._robot_yaw)
 
+    def _goal_direction_range(self, scan: LaserScan) -> float | None:
+        """
+        If the direct bearing to the waypoint is sufficiently clear, return a
+        usable forward range so the planner can drive straight toward the
+        waypoint instead of oscillating between symmetric gaps.
+        """
+        if self._wp_x is None or self._wp_y is None:
+            return None
+
+        goal_angle = self._angle_to_waypoint()
+        if goal_angle < scan.angle_min or goal_angle > scan.angle_max:
+            return None
+
+        free_ranges: list[float] = []
+        considered = 0
+        free = 0
+        for idx, raw_range in enumerate(scan.ranges):
+            angle = scan.angle_min + idx * scan.angle_increment
+            if abs(_angle_wrap(angle - goal_angle)) > self._goal_clear_half_rad:
+                continue
+
+            considered += 1
+            if math.isinf(raw_range) or math.isnan(raw_range):
+                r_use = scan.range_max
+            else:
+                r_use = raw_range
+
+            if r_use > self._min_clearance and r_use <= scan.range_max:
+                free += 1
+                free_ranges.append(r_use)
+
+        if considered == 0:
+            return None
+
+        if (free / considered) < self._goal_clear_min_fraction:
+            return None
+
+        if not free_ranges:
+            return None
+
+        return min(free_ranges)
+
 
 # ---------------------------------------------------------------------------
 # Pure utilities
@@ -310,6 +381,10 @@ def _angle_wrap(a: float) -> float:
     while a >  math.pi: a -= 2.0 * math.pi
     while a < -math.pi: a += 2.0 * math.pi
     return a
+
+
+def _clamp(val: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, val))
 
 
 # ---------------------------------------------------------------------------

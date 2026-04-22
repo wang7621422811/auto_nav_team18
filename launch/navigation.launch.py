@@ -89,8 +89,8 @@ def generate_launch_description() -> LaunchDescription:
             name='path_follower',
             output='screen',
             parameters=[
-                _cfg('waypoints.yaml'),
                 _cfg('robot.yaml'),
+                _cfg('waypoints.yaml'),
                 {
                     'waypoints_file': waypoints_file,
                     'use_sim_time': use_sim_time,

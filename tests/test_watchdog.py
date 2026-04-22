@@ -117,13 +117,23 @@ from auto_nav.teleop.gamepad_watchdog_node import GamepadWatchdogNode  # noqa: E
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_node(axis_deadman=5, deadman_threshold=0.5, joy_timeout_sec=1.0):
+def _make_node(
+    axis_deadman=5,
+    deadman_axis_secondary=-1,
+    deadman_threshold=0.5,
+    joy_timeout_sec=1.0,
+    deadman_axis_pressed_high=True,
+    deadman_button=-1,
+):
     """Build a GamepadWatchdogNode with given params (no live ROS2 needed)."""
     node = GamepadWatchdogNode.__new__(GamepadWatchdogNode)
     # Inject params directly
     node._params = {
         'axis_deadman':      axis_deadman,
+        'deadman_axis_secondary': deadman_axis_secondary,
+        'deadman_button':    deadman_button,
         'deadman_threshold': deadman_threshold,
+        'deadman_axis_pressed_high': deadman_axis_pressed_high,
         'joy_timeout_sec':   joy_timeout_sec,
     }
     node._logger = MagicMock()
@@ -140,7 +150,10 @@ def _make_node(axis_deadman=5, deadman_threshold=0.5, joy_timeout_sec=1.0):
 
     # Manually call __init__ logic without super().__init__
     node._axis_deadman       = axis_deadman
+    node._deadman_axis_secondary = deadman_axis_secondary
+    node._deadman_button     = deadman_button
     node._deadman_threshold  = deadman_threshold
+    node._deadman_axis_pressed_high = deadman_axis_pressed_high
     node._timeout            = joy_timeout_sec
     node._pub_deadman        = MagicMock()
     node._pub_connected      = MagicMock()
@@ -188,6 +201,41 @@ class TestWatchdogDeadman(unittest.TestCase):
         joy.axes[5] = 0.5
         node._joy_cb(joy)
         self.assertFalse(node._deadman_ok)
+
+    def test_deadman_true_when_trigger_below_threshold_if_pressed_low(self):
+        node = _make_node(
+            axis_deadman=5,
+            deadman_threshold=0.0,
+            deadman_axis_pressed_high=False,
+        )
+        joy = _make_joy(axes=[1.0] * 8)
+        joy.axes[5] = -1.0
+        node._joy_cb(joy)
+        self.assertTrue(node._deadman_ok)
+
+    def test_deadman_false_when_trigger_above_threshold_if_pressed_low(self):
+        node = _make_node(
+            axis_deadman=5,
+            deadman_threshold=0.0,
+            deadman_axis_pressed_high=False,
+        )
+        joy = _make_joy(axes=[1.0] * 8)
+        joy.axes[5] = 1.0
+        node._joy_cb(joy)
+        self.assertFalse(node._deadman_ok)
+
+    def test_secondary_axis_can_activate_deadman(self):
+        node = _make_node(
+            axis_deadman=5,
+            deadman_axis_secondary=4,
+            deadman_threshold=0.0,
+            deadman_axis_pressed_high=False,
+        )
+        joy = _make_joy(axes=[1.0] * 8)
+        joy.axes[4] = -1.0
+        joy.axes[5] = 1.0
+        node._joy_cb(joy)
+        self.assertTrue(node._deadman_ok)
 
     def test_axis_out_of_range_does_not_crash(self):
         """If Joy message has fewer axes than configured index, deadman stays False."""

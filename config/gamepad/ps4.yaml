@@ -4,11 +4,11 @@
 # Switch profile with:  ros2 launch auto_nav teleop.launch.py gamepad:=ps4
 #
 # Physical layout (sensor_msgs/Joy indices, 0-based):
-#   axes[0]  Left stick X (→ turn)      axes[4]  R2 trigger
-#   axes[1]  Left stick Y (↑ forward)   axes[5]  L2 trigger
-#   axes[2]  L2 analog                  buttons[0]  Cross (✕)
-#   axes[3]  Right stick X              buttons[1]  Circle (◯)
-#   axes[4]  Right stick Y              buttons[2]  Square (□)
+#   axes[0]  Left stick X (→ turn)      axes[4]  L2 trigger
+#   axes[1]  Left stick Y (↑ forward)   axes[5]  R2 trigger
+#   axes[2]  Right stick X              buttons[0]  Cross (✕)
+#   axes[3]  Right stick Y              buttons[1]  Circle (◯)
+#                                       buttons[2]  Square (□)
 #                                       buttons[3]  Triangle (△)
 # Verify your exact mapping with:  ros2 topic echo /joy
 # ============================================================
@@ -34,9 +34,11 @@
 
 /gamepad_watchdog:
   ros__parameters:
-    axis_deadman: 5        # R2 trigger axis  (range -1 … +1, fully pressed ≈ +1)
+    axis_deadman: 5        # R2 trigger axis
+    deadman_axis_secondary: 4 # L2 also acts as deadman
     deadman_button: -1     # -1 = use axis, not button
-    deadman_threshold: 0.5
+    deadman_threshold: 0.0 # this driver reports trigger released≈+1, pressed≈-1
+    deadman_axis_pressed_high: false
     joy_timeout_sec: 1.0
 
 /joy_mapper:

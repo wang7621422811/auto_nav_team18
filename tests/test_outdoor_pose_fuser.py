@@ -400,6 +400,14 @@ class TestOutdoorPoseFuser(unittest.TestCase):
         self.assertAlmostEqual(tf_msg.transform.rotation.z, nav_msg.pose.pose.orientation.z)
         self.assertAlmostEqual(tf_msg.transform.rotation.w, nav_msg.pose.pose.orientation.w)
 
+    def test_status_tick_republishes_current_state(self):
+        node = _make_node()
+        node._state = NavState.GPS_READY
+
+        node._status_tick()
+
+        self.assertEqual(_last_status(node), NavState.GPS_READY.value)
+
 
 if __name__ == '__main__':
     unittest.main()
