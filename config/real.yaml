@@ -17,6 +17,9 @@
     camera_x: 0.24
     camera_y: 0.00
     camera_z: 0.261
+    imu_x: 0.00
+    imu_y: 0.00
+    imu_z: 0.23
 
 # LiDAR driver selection still comes from the bringup launch argument
 # ``lidar_type:=sick|lakibeam``. Host/IP overrides below are node-specific.

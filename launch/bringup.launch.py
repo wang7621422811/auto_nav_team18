@@ -25,10 +25,13 @@ CLI arguments (all have defaults; override on command line):
   camera_mx_id:=          (empty = auto)
   use_sim_time:=false
   use_gps:=false
+  use_imu:=true
   use_nmea_gps:=false
   gps_port:=/dev/ttyACM0
   gps_baud:=9600
   gps_frame_id:=gps
+  imu_serial:=-1
+  imu_hub_port:=0
   aria_pkg:=ariaNode
   aria_exec:=ariaNode     (confirmed via `ros2 pkg executables ariaNode` on pioneer1)
 """
@@ -48,7 +51,8 @@ from launch.actions import (
     OpaqueFunction,
 )
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer, Node
+from launch_ros.descriptions import ComposableNode
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +101,10 @@ def generate_launch_description() -> LaunchDescription:
             description='GPS outdoor mode: launch outdoor_pose_fuser instead of odom_tf_broadcaster',
         ),
         DeclareLaunchArgument(
+            'use_imu', default_value='true',
+            description='Launch the Phidget Spatial 3/3/3 IMU driver and publish /imu/data',
+        ),
+        DeclareLaunchArgument(
             'use_nmea_gps', default_value='false',
             description='Launch nmea_navsat_driver for serial GPS fixes on /fix',
         ),
@@ -111,6 +119,14 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'gps_frame_id', default_value='gps',
             description='frame_id published by nmea_navsat_driver',
+        ),
+        DeclareLaunchArgument(
+            'imu_serial', default_value='-1',
+            description='Phidget Spatial serial number (-1 = first available device)',
+        ),
+        DeclareLaunchArgument(
+            'imu_hub_port', default_value='0',
+            description='Phidget VINT hub port for Spatial (0 when directly attached)',
         ),
         DeclareLaunchArgument(
             'joy_dev', default_value='/dev/input/js0',
@@ -232,13 +248,13 @@ def generate_launch_description() -> LaunchDescription:
 
     # ---- 5. Static TF publishers (xyz from config/robot.yaml) ------------
     def _sensor_static_tf(context, *args, **kwargs):
-        """Publish base_link→laser and base_link→camera_link from layered config."""
+        """Publish base_link sensor TFs from layered config."""
         cfg_paths = [_cfg('robot.yaml'), _cfg('real.yaml')]
         try:
             ex = load_sensor_xyz_from_files(cfg_paths)
         except (OSError, ValueError) as e:
             raise RuntimeError(
-                f'[bringup] Failed to read laser/camera XYZ from {cfg_paths}: {e}'
+                f'[bringup] Failed to read laser/camera/imu XYZ from {cfg_paths}: {e}'
             ) from e
 
         use_sim = context.launch_configurations.get('use_sim_time', 'false')
@@ -246,6 +262,7 @@ def generate_launch_description() -> LaunchDescription:
 
         laser_args = static_transform_arguments(ex['laser'], child='laser')
         cam_args = static_transform_arguments(ex['camera'], child='camera_link')
+        imu_args = static_transform_arguments(ex['imu'], child='imu_link')
 
         return [
             Node(
@@ -260,6 +277,13 @@ def generate_launch_description() -> LaunchDescription:
                 executable='static_transform_publisher',
                 name='tf_base_to_camera',
                 arguments=cam_args,
+                parameters=[sim_params],
+            ),
+            Node(
+                package='tf2_ros',
+                executable='static_transform_publisher',
+                name='tf_base_to_imu',
+                arguments=imu_args,
                 parameters=[sim_params],
             ),
         ]
@@ -376,6 +400,64 @@ def generate_launch_description() -> LaunchDescription:
             )
         ]
 
+    def _imu_nodes(context, *args, **kwargs):
+        """Optionally launch the Phidget Spatial IMU and normalise it onto /imu/data."""
+        if context.launch_configurations.get('use_imu', 'true').lower() != 'true':
+            LogInfo(msg='[bringup] IMU disabled (use_imu:=false)').execute(context)
+            return []
+
+        imu_serial_raw = context.launch_configurations.get('imu_serial', '-1').strip()
+        imu_hub_port_raw = context.launch_configurations.get('imu_hub_port', '0').strip()
+        use_sim_time = context.launch_configurations.get('use_sim_time', 'false') == 'true'
+
+        try:
+            imu_serial = int(imu_serial_raw)
+        except ValueError as exc:
+            raise ValueError(
+                f'[bringup] imu_serial must be an integer, got {imu_serial_raw!r}'
+            ) from exc
+
+        try:
+            imu_hub_port = int(imu_hub_port_raw)
+        except ValueError as exc:
+            raise ValueError(
+                f'[bringup] imu_hub_port must be an integer, got {imu_hub_port_raw!r}'
+            ) from exc
+
+        LogInfo(
+            msg=(
+                '[bringup] Starting Phidget Spatial IMU '
+                f'(serial={imu_serial}, hub_port={imu_hub_port})'
+            )
+        ).execute(context)
+        return [
+            ComposableNodeContainer(
+                name='phidgets_spatial_container',
+                namespace='',
+                package='rclcpp_components',
+                executable='component_container',
+                output='screen',
+                composable_node_descriptions=[
+                    ComposableNode(
+                        package='phidgets_spatial',
+                        plugin='phidgets::SpatialRosI',
+                        name='phidgets_spatial',
+                        parameters=[
+                            _cfg('imu.yaml'),
+                            {
+                                'serial': imu_serial,
+                                'hub_port': imu_hub_port,
+                                'use_sim_time': use_sim_time,
+                            },
+                        ],
+                        remappings=[
+                            ('imu/data_raw', '/imu/data'),
+                        ],
+                    ),
+                ],
+            )
+        ]
+
     def _gamepad_nodes(context, *args, **kwargs):
         """Resolve gamepad profile and create joy + watchdog nodes."""
         gamepad      = context.launch_configurations.get('gamepad', 'ps4')
@@ -416,6 +498,7 @@ def generate_launch_description() -> LaunchDescription:
             LogInfo(msg='=== auto_nav bringup: Step 0 ==='),
             aria_node,
             OpaqueFunction(function=_tf_nodes),
+            OpaqueFunction(function=_imu_nodes),
             OpaqueFunction(function=_gps_nodes),
             OpaqueFunction(function=_lidar_nodes),
             OpaqueFunction(function=_camera_nodes),

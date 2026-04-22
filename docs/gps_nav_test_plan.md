@@ -88,17 +88,22 @@
 
 ```bash
 cd /Users/weibin/workspace/University/AUTO4508/workspace/auto_nav_team18
-USE_GPS=true USE_NMEA_GPS=true ./scripts/start_all_services.sh test
+./scripts/start_all_services.sh
 ```
 
-如果 waypoint 文件需要显式指定，使用：
+默认行为已经固定为：
+
+- 启动 GPS；
+- 启动 IMU；
+- 启动相机；
+- 使用 `config/waypoints_real_gps.yaml`；
+- 拒绝 `waypoints_data.yaml`。
+
+只有在 bench/室内联调时，才使用：
 
 ```bash
 cd /Users/weibin/workspace/University/AUTO4508/workspace/auto_nav_team18
-USE_GPS=true \
-USE_NMEA_GPS=true \
-WAYPOINTS_FILE=/Users/weibin/workspace/University/AUTO4508/workspace/auto_nav_team18/config/waypoints_real_gps.yaml \
-./scripts/start_all_services.sh test
+./scripts/start_all_services.sh bench
 ```
 
 ### 5.2 必查 topic

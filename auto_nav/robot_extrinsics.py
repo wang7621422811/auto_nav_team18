@@ -13,6 +13,9 @@ _KEYS = (
     'camera_x',
     'camera_y',
     'camera_z',
+    'imu_x',
+    'imu_y',
+    'imu_z',
 )
 
 
@@ -43,7 +46,7 @@ def _collect_scalars(paths: Iterable[str | Path]) -> dict[str, float]:
 
 
 def load_sensor_xyz_from_files(paths: Iterable[str | Path]) -> dict[str, tuple[float, float, float]]:
-    """Parse laser_* and camera_* metres from layered config files."""
+    """Parse laser_*, camera_*, and imu_* metres from layered config files."""
     found = _collect_scalars(paths)
 
     missing = [k for k in _KEYS if k not in found]
@@ -54,6 +57,7 @@ def load_sensor_xyz_from_files(paths: Iterable[str | Path]) -> dict[str, tuple[f
     return {
         'laser': (found['laser_x'], found['laser_y'], found['laser_z']),
         'camera': (found['camera_x'], found['camera_y'], found['camera_z']),
+        'imu': (found['imu_x'], found['imu_y'], found['imu_z']),
     }
 
 

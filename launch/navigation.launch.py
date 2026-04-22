@@ -35,6 +35,10 @@ def _cfg(filename: str) -> str:
     )
 
 
+def _normalize_waypoint_path(path: str) -> str:
+    return os.path.basename(path.strip())
+
+
 def generate_launch_description() -> LaunchDescription:
 
     args = [
@@ -59,6 +63,13 @@ def generate_launch_description() -> LaunchDescription:
         waypoints_file = context.launch_configurations.get('waypoints_file', '').strip()
         if not waypoints_file:
             waypoints_file = _cfg('waypoints_real_gps.yaml' if use_gps else 'waypoints_data.yaml')
+        waypoint_basename = _normalize_waypoint_path(waypoints_file)
+
+        if use_gps and waypoint_basename == 'waypoints_data.yaml':
+            raise ValueError(
+                '[navigation] GPS mode requires a real outdoor waypoint file; '
+                f'refusing local file {waypoints_file!r}.'
+            )
 
         odom_remaps = [('/odom', '/nav/odom')] if use_gps else []
         if use_gps:

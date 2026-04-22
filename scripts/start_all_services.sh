@@ -3,18 +3,18 @@
 set -euo pipefail
 
 # Usage:
-#   ./scripts/start_all_services.sh [full|test|bench]
+#   ./scripts/start_all_services.sh [full|bench]
 #
 # Modes:
-#   full  - build, then start full stack with current/default flags
-#   test  - build, then start full stack with GPS + NMEA GPS + camera enabled
+#   full  - build, then start full outdoor stack with real GPS waypoints
 #   bench - build, then start bringup + teleop + navigation_bench
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-full}"
 ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 
-USE_GPS="${USE_GPS:-false}"
+USE_GPS="${USE_GPS:-true}"
+USE_IMU="${USE_IMU:-true}"
 USE_CAMERA="${USE_CAMERA:-true}"
 USE_NMEA_GPS="${USE_NMEA_GPS:-}"
 USE_SIM_TIME="${USE_SIM_TIME:-false}"
@@ -24,22 +24,34 @@ SERIAL_PORT="${SERIAL_PORT:-/dev/ttyUSB0}"
 GPS_PORT="${GPS_PORT:-/dev/ttyACM0}"
 GPS_BAUD="${GPS_BAUD:-9600}"
 GPS_FRAME_ID="${GPS_FRAME_ID:-gps}"
-WAYPOINTS_FILE="${WAYPOINTS_FILE:-}"
+IMU_SERIAL="${IMU_SERIAL:--1}"
+IMU_HUB_PORT="${IMU_HUB_PORT:-0}"
+WAYPOINTS_FILE="${WAYPOINTS_FILE:-${ROOT_DIR}/config/waypoints_real_gps.yaml}"
+GPS_WAYPOINTS_FILE="${ROOT_DIR}/config/waypoints_real_gps.yaml"
+LOCAL_WAYPOINTS_FILE="${ROOT_DIR}/config/waypoints_data.yaml"
 
 PIDS=()
 
 resolve_mode_defaults() {
-    if [[ "${MODE}" == "test" ]]; then
-        USE_GPS="true"
-        USE_CAMERA="true"
-        if [[ -z "${USE_NMEA_GPS}" ]]; then
-            USE_NMEA_GPS="true"
-        fi
-        return
-    fi
-
     if [[ -z "${USE_NMEA_GPS}" ]]; then
         USE_NMEA_GPS="${USE_GPS}"
+    fi
+
+    if [[ "${MODE}" == "bench" ]]; then
+        USE_GPS="false"
+    fi
+
+    if [[ "${MODE}" != "bench" ]]; then
+        USE_GPS="true"
+        USE_CAMERA="true"
+        USE_SIM_TIME="false"
+        WAYPOINTS_FILE="${GPS_WAYPOINTS_FILE}"
+    fi
+
+    if [[ "${USE_GPS}" == "true" ]] && { [[ "${WAYPOINTS_FILE}" == "${LOCAL_WAYPOINTS_FILE}" ]] || [[ "${WAYPOINTS_FILE}" == *"/waypoints_data.yaml" ]]; }; then
+        echo "[error] GPS outdoor mode refuses local waypoint file: ${WAYPOINTS_FILE}" >&2
+        echo "[error] Use ${GPS_WAYPOINTS_FILE} or another real GPS waypoint file instead." >&2
+        exit 1
     fi
 }
 
@@ -87,13 +99,18 @@ build_workspace() {
 print_summary() {
     echo "[mode] ${MODE}"
     echo "[gps] ${USE_GPS}"
+    echo "[imu] ${USE_IMU}"
     echo "[nmea_gps] ${USE_NMEA_GPS}"
     echo "[camera] ${USE_CAMERA}"
+    echo "[sim_time] ${USE_SIM_TIME}"
+    if [[ -n "${WAYPOINTS_FILE}" ]]; then
+        echo "[waypoints_file] ${WAYPOINTS_FILE}"
+    fi
 }
 
 main() {
-    if [[ "${MODE}" != "full" && "${MODE}" != "test" && "${MODE}" != "bench" ]]; then
-        echo "Usage: ./scripts/start_all_services.sh [full|test|bench]" >&2
+    if [[ "${MODE}" != "full" && "${MODE}" != "bench" ]]; then
+        echo "Usage: ./scripts/start_all_services.sh [full|bench]" >&2
         exit 1
     fi
 
@@ -110,11 +127,14 @@ main() {
         ros2 launch auto_nav bringup.launch.py \
         serial_port:="${SERIAL_PORT}" \
         use_gps:="${USE_GPS}" \
+        use_imu:="${USE_IMU}" \
         use_nmea_gps:="${USE_NMEA_GPS}" \
         use_camera:="${USE_CAMERA}" \
         gps_port:="${GPS_PORT}" \
         gps_baud:="${GPS_BAUD}" \
         gps_frame_id:="${GPS_FRAME_ID}" \
+        imu_serial:="${IMU_SERIAL}" \
+        imu_hub_port:="${IMU_HUB_PORT}" \
         joy_dev:="${JOY_DEV}" \
         gamepad:="${GAMEPAD}" \
         use_sim_time:="${USE_SIM_TIME}"

@@ -28,6 +28,8 @@
   <exec_depend>ariaNode</exec_depend>        <!-- Pioneer chassis driver (course stack) -->
   <exec_depend>depthai_ros_driver</exec_depend> <!-- OAK-D V2 camera -->
   <exec_depend>nmea_navsat_driver</exec_depend> <!-- optional outdoor GPS serial driver -->
+  <exec_depend>phidgets_spatial</exec_depend>   <!-- Phidget Spatial 3/3/3 IMU -->
+  <exec_depend>rclcpp_components</exec_depend>  <!-- component container for IMU driver -->
   <!-- sick_scan_xd / lakibeam driver selected at launch time via arg -->
 
   <!-- Launch -->

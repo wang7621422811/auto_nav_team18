@@ -48,5 +48,11 @@
     camera_y: 0.00
     camera_z: 0.261
 
+    # base_link → imu_link (Phidget Spatial 3/3/3 mounted near chassis centre)
+    # Replace these with tape-measured values if your real mounting differs.
+    imu_x: 0.00
+    imu_y: 0.00
+    imu_z: 0.23
+
     # ------- Watchdog / safety -------
     cmd_vel_timeout_sec: 0.5   # stop if no cmd_vel received within this window

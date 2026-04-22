@@ -11,7 +11,7 @@ def test_start_all_script_exists_and_is_documented() -> None:
     assert SCRIPT.is_file()
     assert "#!/usr/bin/env bash" in content
     assert "Usage:" in content
-    assert "[full|test|bench]" in content
+    assert "[full|bench]" in content
 
 
 def test_start_all_script_launches_full_stack_in_order() -> None:
@@ -33,13 +33,43 @@ def test_start_all_script_supports_bench_mode() -> None:
     assert 'if [[ "${MODE}" == "bench" ]]' in content
 
 
-def test_start_all_script_has_real_world_test_mode() -> None:
+def test_start_all_script_defaults_to_real_world_outdoor_mode() -> None:
     content = SCRIPT.read_text(encoding="utf-8")
 
-    assert 'if [[ "${MODE}" == "test" ]]' in content
+    assert 'USE_GPS="${USE_GPS:-true}"' in content
+    assert 'USE_CAMERA="${USE_CAMERA:-true}"' in content
+    assert 'WAYPOINTS_FILE="${WAYPOINTS_FILE:-${ROOT_DIR}/config/waypoints_real_gps.yaml}"' in content
+    assert 'if [[ "${MODE}" != "bench" ]]; then' in content
+    assert 'WAYPOINTS_FILE="${GPS_WAYPOINTS_FILE}"' in content
+
+
+def test_start_all_script_forces_real_outdoor_stack_in_full_mode() -> None:
+    content = SCRIPT.read_text(encoding="utf-8")
+
     assert 'USE_GPS="true"' in content
     assert 'USE_CAMERA="true"' in content
-    assert 'USE_NMEA_GPS="true"' in content
+    assert 'USE_SIM_TIME="false"' in content
+    assert 'USE_NMEA_GPS="${USE_GPS}"' in content
+
+
+def test_start_all_script_enables_imu_and_passes_phidget_args() -> None:
+    content = SCRIPT.read_text(encoding="utf-8")
+
+    assert 'USE_IMU="${USE_IMU:-true}"' in content
+    assert 'IMU_SERIAL="${IMU_SERIAL:--1}"' in content
+    assert 'IMU_HUB_PORT="${IMU_HUB_PORT:-0}"' in content
+    assert 'use_imu:="${USE_IMU}"' in content
+    assert 'imu_serial:="${IMU_SERIAL}"' in content
+    assert 'imu_hub_port:="${IMU_HUB_PORT}"' in content
+
+
+def test_start_all_script_rejects_local_waypoints_in_gps_mode() -> None:
+    content = SCRIPT.read_text(encoding="utf-8")
+
+    assert 'GPS_WAYPOINTS_FILE="${ROOT_DIR}/config/waypoints_real_gps.yaml"' in content
+    assert 'LOCAL_WAYPOINTS_FILE="${ROOT_DIR}/config/waypoints_data.yaml"' in content
+    assert 'if [[ "${USE_GPS}" == "true" ]] && { [[ "${WAYPOINTS_FILE}" == "${LOCAL_WAYPOINTS_FILE}" ]] || [[ "${WAYPOINTS_FILE}" == *"/waypoints_data.yaml" ]]; }; then' in content
+    assert 'GPS outdoor mode refuses local waypoint file' in content
 
 
 def test_start_all_script_relaxes_nounset_while_sourcing_ros() -> None:

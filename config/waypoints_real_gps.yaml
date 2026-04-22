@@ -15,10 +15,10 @@ waypoints:
     lat: -31.9803568
     lon: 115.8174252
 
-  # - name: wp2
-  #   type: gps
-  #   lat: -31.980408
-  #   lon: 115.817671
+  - name: wp2
+    type: gps
+    lat: -31.980408
+    lon: 115.817671
 
   # - name: wp3
   #   type: gps

@@ -87,6 +87,8 @@ start_rosbag_record() {
         /deadman_ok
         /emergency_stop
         /fix
+        /imu/data
+        /odom
         /nav/status
         /nav/odom
         /waypoint/current
@@ -201,6 +203,8 @@ main() {
     write_snapshot "${LOG_DIR}/path_follower_use_gps.txt" ros2 param get /path_follower use_gps
 
     start_background_snapshot "${LOG_DIR}/control_mode_once.txt" ros2 topic echo --once /control_mode
+    start_background_snapshot "${LOG_DIR}/imu_data_once.txt" ros2 topic echo --once /imu/data
+    start_background_snapshot "${LOG_DIR}/odom_once.txt" ros2 topic echo --once /odom
     start_background_snapshot "${LOG_DIR}/nav_status_once.txt" ros2 topic echo --once /nav/status
     start_background_snapshot "${LOG_DIR}/nav_odom_once.txt" ros2 topic echo --once /nav/odom
     start_background_snapshot "${LOG_DIR}/waypoint_current_once.txt" ros2 topic echo --once /waypoint/current

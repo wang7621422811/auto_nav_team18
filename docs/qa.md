@@ -3,6 +3,408 @@
 ## 2026-04-22
 
 ### 问题
+收到带 `/scan` 的室外 `AUTO` 日志 `gps_debug_20260422_114851_gps_outdoor_spin.zip`。用户描述为“原地左右打转”。需要明确判断是 LiDAR 局部规划导致，还是 IMU 航向方向本身与车体前向相反。
+
+### 日志核对
+- `control_mode_once.txt`：`AUTO`
+- `waypoint_status_once.txt`：`NAVIGATING`
+- `nav_status_once.txt`：`GPS_READY`
+- `path_follower_waypoints_file.txt`：`/root/workspace/auto_nav_team18/config/waypoints_real_gps.yaml`
+- `recorded_topics.txt`：本次已包含 `/scan`
+- `nodes.txt`：`/outdoor_pose_fuser`、`/phidgets_spatial`、`/sick_scan` 都在线
+
+### 关键分析
+- 快照时：
+- raw `/odom` 朝向约 `39.1°`
+- `/nav/odom` 朝向约 `-144.6°`
+- `/imu/data` 朝向约 `-142.5°`
+- 当前 waypoint bearing 约 `42.8°`
+- 这说明：
+- raw `/odom` 本来已经基本朝向 waypoint，误差只有约 `-4.9°`
+- 但 `outdoor_pose_fuser` 一旦采用 IMU yaw，`/nav/odom` 会被翻到几乎相反方向，与 waypoint 的夹角约 `172.6°`
+- 同时快照中的角速度：
+- `/odom.twist.angular.z ≈ -0.873 rad/s`
+- `/nav/odom.twist.angular.z ≈ -0.866 rad/s`
+- 线速度几乎为零
+- 这与现场“原地左右打转”高度一致。
+
+### 结论
+- 这次根因已经可以明确：
+- **Phidget Spatial 的 yaw 参考方向相对 `base_link` 反了约 180°，导致 `outdoor_pose_fuser` 用 IMU yaw 后把导航朝向翻到 waypoint 反方向。**
+- 因此这不是：
+- 启动模式错误；
+- `waypoints_data.yaml` 回退；
+- 也不是当前证据下最主要的 LiDAR 局部避障问题。
+
+### 修改
+- 在 `auto_nav/navigation/outdoor_pose_fuser.py` 中新增参数：
+- `imu_yaw_offset_deg`
+- IMU 回调现在会先把四元数 yaw 加上该偏置，再作为 fused yaw 使用。
+- 在 `config/gps.yaml` 中将：
+- `imu_yaw_offset_deg: 180.0`
+- 并注明当前真实机器上 Phidget Spatial 的安装朝向与 `base_link` 反向。
+- 在 `tests/test_outdoor_pose_fuser.py` 中补充：
+- IMU yaw offset 应用于融合姿态前的单元测试。
+
+### 测试
+- 执行：
+- `python3 -m pytest tests/test_outdoor_pose_fuser.py -q`
+- 结果：`8 passed in 0.04s`
+- 执行：
+- `python3 -m pytest tests/test_start_all_services_script.py tests/test_tf_tree.py -q`
+- 结果：`21 passed in 0.02s`
+
+### 结论补充
+- 这次修复不是简单地禁用 IMU，而是保留 IMU 航向链路，同时按当前实机安装方向补 180° 修正。
+- 这样既能继续利用 IMU 抑制 GPS/odom 漂移，又能避免导航朝向被整体翻转到目标点反方向。
+
+### 问题
+收到新的室外 `AUTO` 日志 `gps_debug_20260422_113116.zip`。用户反馈“车乱窜，而且一直在转向”。需要判断这次是否仍然是启动模式错误，还是已经进入真实 GPS 模式后控制本身出现振荡。
+
+### 日志核对
+- `control_mode_once.txt`：`AUTO`
+- `waypoint_status_once.txt`：`NAVIGATING`
+- `nav_status_once.txt`：`GPS_READY`
+- `path_follower_waypoints_file.txt`：`/root/workspace/auto_nav_team18/config/waypoints_real_gps.yaml`
+- `nodes.txt`：有 `/outdoor_pose_fuser`，没有 `/odom_tf_broadcaster`
+- `nav_odom_once.txt`：`/nav/odom` 正常发布
+
+### 关键分析
+- 这次与之前 `gps_debug_20260422_111249.zip` 不同，启动模式已经正确：
+- 真正进入了 GPS 模式；
+- 真正用了 `waypoints_real_gps.yaml`；
+- `outdoor_pose_fuser` 正常在线；
+- `nav_status=GPS_READY`。
+- 快照中：
+- `nav_odom` 位置约 `(-16.82, -6.61)`
+- 当前 waypoint 约 `(5.21, 19.48)`
+- `nav_odom` 朝向约 `51.3°`
+- 从当前 `nav_odom` 指向 waypoint 的 bearing 约 `49.8°`
+- 两者误差仅约 `-1.5°`。
+- 也就是说，在快照这一刻，机器人全局朝向其实**已经大致对准 waypoint**，并不存在“静态上完全反着 180°”这种情况。
+
+### 结论
+- 这次问题**不是**“又跑错到本地 waypoint 模式”。
+- 但从现有包里也**不能直接证明**是 IMU yaw 符号反了，因为静态快照时 heading 与 waypoint bearing 是基本一致的。
+- 更像的情况是：
+- 运行过程中 `/cmd_vel_auto`、`/cmd_vel_safe` 或 `/local_target` / `/gap/local_target` 在跳变；
+- 或 GPS / 融合位置在过程中有抖动，导致控制器反复重新找角度；
+- 或局部规划层在持续发布偏转目标。
+
+### 证据缺口
+- 这份包虽然录了 `/cmd_vel_auto`、`/cmd_vel_safe`、`/local_target`、`/gap/local_target`，但当前本地环境没有直接解析 MCAP 的 ROS 2 工具链，无法从时间序列里恢复“到底是谁在持续下转向命令”。
+- 同时这次 `record_scan=false`，没有 `/scan`，所以无法判断是否是 LiDAR 局部避障在主导转向。
+- `imu_data_once.txt` 也没有成功抓到本次快照，因此无法用快照交叉验证这一刻的 IMU yaw。
+
+### 下一步建议
+- 下一次 outdoor `AUTO` 复测必须开：
+- `RECORD_SCAN=true`
+- 并保留 `/cmd_vel_auto`、`/cmd_vel_safe`、`/local_target`、`/gap/local_target`、`/weave/local_target`
+- 这样才能明确区分：
+- 是 `path_follower` 自己在发转向；
+- 还是 `gap_planner` / `local_planner` 在持续把目标拉向侧面；
+- 还是 `obstacle_guard` / safety gate 在改写速度。
+
+### 问题
+用户明确要求启动脚本默认行为改成“真机室外 GPS 模式”，不再依赖额外传参，也不允许默认落回测试/仿真 waypoint。目标是：
+- 不传参数时默认启动 GPS；
+- 默认启动 IMU；
+- 默认启动相机；
+- 默认使用 `waypoints_real_gps.yaml`；
+- 默认拒绝 `waypoints_data.yaml`。
+
+### 修改
+- 更新 `scripts/start_all_services.sh`：
+- `USE_GPS` 默认值从 `false` 改为 `true`
+- `WAYPOINTS_FILE` 默认值改为 `config/waypoints_real_gps.yaml`
+- 去掉原来的 `test` 模式依赖，不再要求用户通过 `test` 模式才能进入真机 GPS 启动链路
+- `full` 模式现在固定代表“室外真机模式”
+- 只有 `bench` 模式才关闭 GPS，并进入 bench 联调链路
+- `resolve_mode_defaults()` 中对非 `bench` 模式强制：
+- `USE_GPS=true`
+- `USE_CAMERA=true`
+- `USE_SIM_TIME=false`
+- `WAYPOINTS_FILE=waypoints_real_gps.yaml`
+- 继续保留保护逻辑：GPS 模式下一旦检测到 `waypoints_data.yaml`，立即报错退出。
+- 更新 `tests/test_start_all_services_script.py`：
+- 改为校验脚本默认就是 outdoor 真机模式；
+- 校验 usage 现在是 `[full|bench]`；
+- 校验 `full` 模式下强制使用 `waypoints_real_gps.yaml`；
+- 校验 GPS 模式下拒绝本地 waypoint 的逻辑。
+- 更新 `docs/gps_nav_test_plan.md`：
+- 启动命令改为默认直接执行 `./scripts/start_all_services.sh`
+- bench 联调改为 `./scripts/start_all_services.sh bench`
+
+### 测试
+- 执行：
+- `python3 -m pytest tests/test_start_all_services_script.py tests/test_tf_tree.py -q`
+- 结果：`21 passed in 0.03s`
+
+### 结论
+- 现在用户直接运行：
+- `./scripts/start_all_services.sh`
+- 就会默认进入：
+- 真机 GPS
+- 真机 IMU
+- 真机相机
+- `waypoints_real_gps.yaml`
+- 这样可以从启动脚本层面减少再次误跑到 `waypoints_data.yaml` / `odom_tf_broadcaster` 模式的概率。
+
+### 问题
+收到室外 `AUTO` 日志 `gps_debug_20260422_111249.zip`。用户反馈“方向完全相反，而且一直转向”，需要判断是 IMU 融合方向错误，还是系统再次错误地跑到了室内/本地 waypoint 模式。
+
+### 日志核对
+- `control_mode_once.txt`：`AUTO`
+- `waypoint_status_once.txt`：`NAVIGATING`
+- `nodes.txt`：运行的是 `/odom_tf_broadcaster`，**不是** `/outdoor_pose_fuser`
+- `nav_odom_once.txt`：`/nav/odom` 实际上没有发布
+- `nav_status_once.txt`：`/nav/status` 实际上没有发布
+- `path_follower_waypoints_file.txt`：`/root/workspace/auto_nav_team18/install/auto_nav/share/auto_nav/config/waypoints_data.yaml`
+- `waypoint_current_once.txt`：当前目标点是 `(-11.0, -11.0)`，这是本地 `odom` 平面里的仿真/室内 waypoint，不是真实 GPS waypoint
+
+### 关键分析
+- 这份日志最重要的证据不是 IMU，而是：
+- `bringup` 侧启动了 `odom_tf_broadcaster`
+- 没有启动 `outdoor_pose_fuser`
+- `path_follower` 读到的是 `waypoints_data.yaml`
+- `waypoint/current` 的 frame 也是本地 `odom`
+- 这意味着系统此时**根本没在跑 GPS 室外模式**，而是在拿真实机器人去追一个本地平面目标 `(-11, -11)`。
+- 对真实 outdoor 机器人来说，这种目标当然会表现成：
+- 朝向完全不对；
+- 一直原地找角度；
+- 转向像“完全相反”。
+- 因为它不是在跟 GPS waypoint 对齐，而是在跟一个错误坐标系下的虚拟 waypoint 对齐。
+
+### 结论
+- 这份 `gps_debug_20260422_111249.zip` **不能说明 IMU 方向错了**；
+- 它说明的是：**这次启动流程又回到了错误模式，没有进入真实 GPS outdoor 导航。**
+- 因此这次“完全反方向、一直转向”的直接根因是：
+- `use_gps` 没有真正生效；
+- `outdoor_pose_fuser` 没有启动；
+- `path_follower` 读取了 `waypoints_data.yaml` 而不是 `waypoints_real_gps.yaml`。
+
+### 修复/检查建议
+- 现场必须先确认以下状态，再允许开始 outdoor AUTO 测试：
+- `ros2 node list | grep outdoor_pose_fuser`
+- `ros2 node list | grep odom_tf_broadcaster`
+- `ros2 param get /path_follower waypoints_file`
+- `ros2 topic echo /nav/status --once`
+- 正确状态应当是：
+- 有 `/outdoor_pose_fuser`
+- 没有 `/odom_tf_broadcaster`
+- `waypoints_file` 指向 `waypoints_real_gps.yaml`
+- `/nav/status` 能发布，例如 `WAITING_FOR_FIX` / `GPS_READY`
+
+### 问题
+收到一份手动驾驶日志 `gps_debug_20260422_104703.zip`。用户反馈“robot 无法推得动”，需要判断这是 IMU/GPS 融合异常，还是底盘本身处于上电抱死/受控状态，导致“手推测试”本身不能作为融合验证手段。
+
+### 日志核对
+- `control_mode_once.txt`：`MANUAL`
+- `waypoint_status_once.txt`：`IDLE`
+- `nav_status_once.txt`：`ODOM_IMU_ONLY`
+- `path_follower_waypoints_file.txt`：仍指向 `waypoints_real_gps.yaml`
+- `nodes.txt`：`/phidgets_spatial`、`/phidgets_spatial_container`、`/outdoor_pose_fuser` 都已在线
+- `imu_data_once.txt`：`/imu/data` 已有真实四元数和角速度
+- `odom_once.txt`：原始底盘 odom 几乎静止，位置约 `x=0.001m`，角速度很小
+- `nav_odom_once.txt`：位置仍几乎静止，但姿态已不再等于 raw `/odom`
+
+### 关键分析
+- 这次记录时系统明确处于 `MANUAL`，`waypoint/status=IDLE`，因此它**不是**一份“自动导航左右摇摆”的日志，而是一份“手动/静止状态下底层姿态融合”的日志。
+- `nav_status=ODOM_IMU_ONLY` 说明当时没有有效 GPS fix 参与，`outdoor_pose_fuser` 正在走“轮速位置 + IMU 航向”的退化模式。
+- 从快照四元数计算：
+- raw `/odom` yaw 约为 `0°`
+- `/imu/data` yaw 约为 `-159.9°`
+- `/nav/odom` yaw 约为 `-159.1°`
+- 这说明 `outdoor_pose_fuser` 此时已经在使用 IMU yaw，而且 `/nav/odom` 与 IMU 只差约 `0.8°`，链路是通的。
+- 同时，`/odom` 几乎没有位移变化，说明记录期间机器人本体基本没发生可观运动。结合“推不动”的现场描述，更符合：
+- Pioneer 底盘上电后电机/传动处于受控或抱死状态；
+- 用户没有通过手柄实际驱动车体产生可观运动；
+- 因此这份包**不能用来判断前进/转弯控制好坏**，只能用来确认 IMU 已经接入并被融合。
+
+### 结论
+- 这份手动日志证明了一件好事：
+- **Phidget Spatial 3/3/3 已经成功接入，`/nav/odom` 航向已经跟随 IMU。**
+- 但它也说明：
+- **“手推机器人”不是当前这台上电 Pioneer 的有效测试方法。**
+- 因为底盘几乎没动，日志不足以评估自动导航摇摆问题，也不足以检验 `odom` 与 IMU 在真实运动中的符号/方向关系。
+
+### 下一步建议
+- 之后的验证必须改成“手柄实际驾驶”，不要再用手推：
+- 原地静止 5 到 10 秒；
+- 手柄直线前进 2 到 3 米；
+- 停住；
+- 原地左转约 90°；
+- 停住；
+- 再原地右转约 90° 回来。
+- 并继续用 `record_gps_debug.sh` 录包。
+- 这样才能检查：
+- `/cmd_vel_safe` 是否真的下发到底盘；
+- `/odom` 的线位移/角位移是否与手柄动作一致；
+- `/imu/data` 的 yaw 增减方向是否和 `/odom` 一致；
+- 若两者符号相反，再决定是改 IMU 安装朝向、TF，还是在融合里做 yaw 反向修正。
+
+### 问题
+需要把真实的 Phidget Spatial 3/3/3 IMU 正式接入项目，而不是只在 `outdoor_pose_fuser` 里预留 `/imu/data` 订阅接口。此前实机上虽然能看到 `/imu`、`/imu/data` 这样的 topic 名字，但没有对应的 IMU publisher 节点上线，导致 GPS 室外导航实际上一直退化为纯轮速/odom 航向。
+
+### 现有实现核对
+- 仓库原先只有 IMU 消费端，没有 IMU 启动链路：
+- `auto_nav/navigation/outdoor_pose_fuser.py` 会订阅 `imu_topic` 并读取四元数 yaw；
+- `config/gps.yaml` 把 `imu_topic` 设为 `/imu/data`；
+- 但 `launch/bringup.launch.py` 之前没有任何 `phidgets_spatial` 或其他 IMU driver 节点。
+- 真实机器日志也验证了这一点：
+- `ros2 topic list | grep imu` 能看到 `/imu`、`/imu/data`；
+- 但 `ros2 node list | grep -E "imu|phidget|spatial|ekf"` 为空；
+- 因此这些 topic 只是接口名存在，不代表有真实消息流。
+
+### 修改
+- 在 `launch/bringup.launch.py` 新增 IMU bringup 参数与节点：
+- 新增 `use_imu`、`imu_serial`、`imu_hub_port` launch argument；
+- 新增 `_imu_nodes()`，使用 `rclcpp_components` 容器加载 `phidgets_spatial` 的 `phidgets::SpatialRosI` 组件；
+- 将官方默认 `/imu/data_raw` 直接 remap 成项目统一接口 `/imu/data`，避免下游节点继续分叉；
+- 保留 `gps.yaml` 中的 `/imu/data` 作为系统唯一 IMU topic 入口。
+- 新增 `config/imu.yaml`：
+- 固化 Phidget Spatial 3/3/3 的运行参数；
+- 默认 `use_orientation: true`，让驱动直接输出可被 `outdoor_pose_fuser` 使用的姿态四元数；
+- 统一 `frame_id: imu_link`。
+- 扩展真实机器人静态 TF：
+- `config/robot.yaml` 与 `config/real.yaml` 新增 `imu_x / imu_y / imu_z`；
+- `auto_nav/robot_extrinsics.py` 扩展为同时解析 laser / camera / imu 三套外参；
+- `launch/bringup.launch.py` 的 `_sensor_static_tf()` 现在额外发布 `base_link -> imu_link`。
+- 更新启动脚本：
+- `scripts/start_all_services.sh` 新增 `USE_IMU`、`IMU_SERIAL`、`IMU_HUB_PORT`；
+- 默认 `USE_IMU=true`，并在 bringup 启动时自动传给 `bringup.launch.py`，避免每次现场手动补 IMU 命令。
+- 更新运行依赖：
+- `package.xml` 增加 `phidgets_spatial` 与 `rclcpp_components` 运行依赖。
+
+### 测试
+- 新增/更新 `tests/test_tf_tree.py`：
+- 校验 bringup 现在会发布 `tf_base_to_imu`；
+- 校验 `_imu_nodes()` 能正确创建 `phidgets_spatial` 容器，并把 `/imu/data_raw` 规范化到 `/imu/data`。
+- 更新 `tests/test_start_all_services_script.py`：
+- 校验启动脚本默认启用 IMU，并把 `imu_serial` / `imu_hub_port` 传入 bringup。
+- 本次执行：
+- `python3 -m pytest tests/test_tf_tree.py tests/test_start_all_services_script.py tests/test_outdoor_pose_fuser.py -q`
+- 结果：`27 passed in 0.11s`
+- `python3 -m pytest tests/test_waypoints.py -q`
+- 结果：`58 passed in 0.18s`
+
+### 结论
+- 这次修改后，项目层面已经真正具备了：
+- 启动 Phidget Spatial 3/3/3；
+- 统一把真实 IMU 数据接到 `/imu/data`；
+- 给 IMU 提供 `imu_link` TF；
+- 在 `start_all_services.sh` 真机链路里默认带起 IMU。
+- 也就是说，后续现场只要机器人镜像里已安装 `phidgets_spatial`，并且设备映射进容器，`outdoor_pose_fuser` 就不再是“空等一个不存在的 IMU”。
+
+### 剩余风险
+- 当前是在本地仓库层面完成了集成和单测，尚未在你的真机容器里实测 `phidgets_spatial` 包、USB 权限和设备枚举是否完全匹配。
+- `imu_x / imu_y / imu_z` 目前先给了近似默认值 `(0.00, 0.00, 0.23)`；若实机安装位置明显偏离，需要用卷尺实测后修正。
+- 若 Phidget 驱动在你的镜像里使用的参数名与当前 Jazzy 版本存在差异，现场可能需要按实际安装版本微调 `config/imu.yaml`；但系统集成点和项目接口已经统一好了。
+
+### 问题
+需要确认当前 `AUTO` 模式下的避障链路是否已经真正具备以下行为：遇到障碍时绕开障碍物，绕开后再重新对正 waypoint / 目标角度，并继续直线行驶过去。
+
+### 现有实现核对
+- `auto_nav/navigation/gap_planner.py` 在每帧 LiDAR 中先检查“目标方向是否足够通畅”：
+- 若 waypoint bearing 对应的窗口足够清晰，`_goal_direction_range()` 会直接返回该方向的可用距离，随后 `_scan_cb()` 直接按 `goal_angle` 发布 `/gap/local_target`。
+- 若目标方向被挡住，`_find_gaps()` + `_score_and_pick()` 会从所有可通行 gap 中选一个，并且 `_guided_gap_angle()` 不会盲目取 gap 中心，而是尽量把目标角度往 waypoint bearing 拉回，只在超出 gap 边界时才裁到边缘。
+- `auto_nav/navigation/weave_planner.py` 对 1→2 waypoint 的 weaving 段使用同样的“朝 waypoint 回拉”策略，同时额外限制 corridor，避免为了绕障直接绕出锥桶走廊。
+- `auto_nav/navigation/local_planner.py` 只在 `/waypoint/status == NAVIGATING` 时转发局部目标；当局部目标过期时，停止转发，让 `path_follower` 回退到全局 waypoint。
+- `auto_nav/navigation/path_follower.py` 在 `_do_navigating()` 中优先跟随新鲜且位于前向扇区内的 `/local_target`；否则直接回到全局 `waypoint`。
+- 同文件 `_drive_toward()` 在 heading error 过大时会先原地转向，只有角度进入阈值内后才恢复线速度，因此“重新对正后再直行”的控制意图是明确存在的。
+
+### 测试核对
+- `tests/test_navigation_step3.py` 已覆盖：
+- `GapPlannerNode._guided_gap_angle()` 会把目标角度往 waypoint bearing 拉回；
+- `GapPlannerNode._goal_direction_range()` 在目标方向清晰时会优先直接朝 waypoint；
+- `WeavePlannerNode` 也有对应的 guided-gap / clear-goal 用例。
+- `tests/test_waypoints.py` 已覆盖：
+- `PathFollowerNode` 会拒绝后向 `local_target`，避免局部规划把车带到目标背面；
+- `_drive_toward()` 对大角误差会原地旋转，不会在未对正时继续向前冲。
+- 本次执行：
+- `python3 -m pytest tests/test_navigation_step3.py tests/test_waypoints.py -q`
+- 结果：`99 passed in 0.12s`
+
+### 结论
+- 从当前代码实现看，`AUTO` 模式的避障链路**基本已经按“绕障 -> 重新朝 waypoint 拉回 -> 对正后继续前进”这个思路实现**。
+- 更具体地说，它不是单纯急停，而是：
+- LiDAR 先尝试判断目标方向是否恢复通畅；
+- 未恢复时走 gap / weave 局部目标；
+- 恢复后重新发布朝 waypoint bearing 的局部目标；
+- 若局部目标消失或过期，`path_follower` 还会进一步退回全局 waypoint 跟踪。
+- 所以从代码逻辑上判断，这一行为是“有实现”的。
+
+### 剩余风险
+- 当前证据主要来自单元测试和静态代码核对，还**没有**看到“真实 scan 场景下先被挡住、再绕过去、最后稳定回到目标直线”的端到端仿真/实机测试记录。
+- `obstacle_guard.py` 主要保证安全急停；如果场景里一度找不到有效 gap，系统更可能是“停住等待 / 退回 waypoint 驱动后再被 estop 卡住”，而不是保证一定能连续绕出。
+- 因此更准确的表述应是：
+- **实现框架已经具备，回拉目标角度的关键逻辑也在，但是否‘已经弄好到现场稳定可用’还需要补一条端到端验证证据。**
+
+### 问题
+已确认 `outdoor_pose_fuser` 只做平移对齐、没有做航向/坐标轴对齐，需要修复 GPS ENU 与 odom/yaw 参考系不一致导致的系统性偏航。
+
+### 解决
+- 修改 `auto_nav/navigation/outdoor_pose_fuser.py`：
+- 首个有效 GPS fix 不再把 `/nav/odom` 锁在原始 odom 平移坐标里，而是把融合位置锚定到 waypoint 共用的 ENU 平面；
+- 新增基于“GPS 位移方向 vs raw odom 位移方向”的 heading 对齐逻辑，估计 `odom -> ENU` 的固定旋转偏角；
+- 在偏角建立后，把 wheel odom 的位置增量旋转到 ENU 再用于 `/nav/odom` 连续传播；
+- 同时把发布出去的 yaw 也旋转到与 ENU 一致的参考系，保证 `path_follower` 的 `atan2(dy, dx)` 与机器人当前 yaw 使用同一坐标系。
+- 更新 `config/gps.yaml`，新增：
+- `heading_alignment_min_dist_m`
+- `heading_alignment_alpha`
+- 补充 `tests/test_outdoor_pose_fuser.py`：
+- 首个 fix 后 `/nav/odom` 进入 ENU 坐标；
+- GPS 恢复后的平滑回归；
+- 关键新增用例：当 raw odom 轨迹相对 ENU 旋转 90° 时，`outdoor_pose_fuser` 能学习这个偏角，并把后续位置传播与姿态一起旋回 ENU。
+
+### 结论
+- 当前 bug 已按“统一到 ENU 平面 + 自动学习 odom/ENU 航向偏角”的方向修复。
+- 这能直接消除“waypoint 在 ENU，但 `/nav/odom` yaw 不在同一参考系”导致的固定单侧偏航。
+- 现场仍需注意：如果 IMU 自身存在额外磁航向漂移，`use_imu_yaw` 可能仍需要按实测切换回 odom orientation。
+
+### 问题
+需要核查这样一个判断是否成立：当前实机“总是偏一个方向，怎么调都不顺”的现象，根因可能不是 GPS 精度，而是 `outdoor_pose_fuser` 只做了 GPS ENU 到 odom 的平移对齐，没有做航向/坐标轴旋转对齐，导致 `path_follower` 用 yaw 算 heading error 时存在固定参考系偏差。
+
+### 现有实现核对
+- `auto_nav/navigation/geo_localizer.py` 明确把坐标定义为本地 ENU：`x=east, y=north`。
+- `auto_nav/navigation/outdoor_pose_fuser.py` 在 `_fix_cb()` 中把 GPS fix 转成 ENU 后，只做了启动点平移对齐：
+- `target_x = odom_init_x + (east_m - gps_init_e)`
+- `target_y = odom_init_y + (north_m - gps_init_n)`
+- `auto_nav/navigation/outdoor_pose_fuser.py` 没有保存任何“odom/IMU yaw 相对 ENU 的初始偏置”，也没有对 GPS 增量做二维旋转变换。
+- 同文件 `_resolve_orientation()` 只是直接选择 IMU yaw 或原始 odom orientation 作为 `/nav/odom` 的姿态来源。
+- `auto_nav/navigation/path_follower.py` 在 `_heading_error_to()` 中用 `atan2(dy, dx)` 得到目标方向，再直接减去 `self._robot_yaw`。
+- 这说明控制器默认假设：
+- 位置 `(x, y)` 所在坐标系；
+- 当前 `yaw` 的零点与正方向；
+- 二者是同一个参考系。
+
+### 测试覆盖核对
+- `tests/test_outdoor_pose_fuser.py` 目前覆盖了：
+- 首个 GPS fix 的平移对齐；
+- 对齐后的 ENU 位置投影；
+- GPS 丢失后的 odom/IMU fallback；
+- TF 与 `/nav/odom` 一致性。
+- 但没有任何测试验证：
+- IMU yaw 是否已经与 ENU 对齐；
+- odom yaw 与 ENU 是否存在固定偏角；
+- 若存在固定偏角，`outdoor_pose_fuser` 是否会补偿这个角度；
+- 在存在 yaw 偏置时，`path_follower` 的 heading error 是否会稳定错误。
+
+### 结论
+- 这个判断基本成立，且证据强度较高。
+- 目前实现里，`outdoor_pose_fuser` 的“对齐”确实只有位置平移，没有航向旋转对齐。
+- `path_follower` 又明确依赖 `(x, y)` 与 `yaw` 共享同一参考系来计算 heading error。
+- 因此，只要 IMU yaw 或原始 odom yaw 的零点不是 ENU 东北坐标系的同一参考，机器人就会表现出“持续向一侧偏”“参数怎么调都差一个固定角度”的系统性偏航。
+- 所以当前更像是“坐标系/航向参考不一致”的实现缺口，而不是单纯“GPS 精度不够”。
+
+### 建议
+- 主方案仍应保留 `GPS + odom` 融合，不建议直接切成正式的纯 GPS 控制。
+- 下一步优先做两件事：
+- 1. 现场记录机器人静止朝向、直线推车方向与 `/nav/odom` yaw 的关系，确认是否存在固定 yaw 偏角；
+- 2. 给 `outdoor_pose_fuser` 增加“启动时 yaw 相对 ENU 的旋转对齐”设计，或显式改成一个已经保证 ENU 对齐的 heading 来源。
+- 如果只是为了快速诊断，可临时做纯 GPS 对照分支，但它更适合排障，不适合作为最终方案。
+
+### 问题
 真实户外测试里，GPS waypoint 导航持续出现明显偏差，需要评估后续应优先走“纯 GPS 导航”还是“GPS + odom 融合导航”方案。
 
 ### 现有实现核对
@@ -1213,3 +1615,241 @@ PS4 手柄实机上出现了 deadman 逻辑反向：放开 R2 时机器人会进
 - 停止 rosbag；
 - 归档日志；
 - 直接返回 shell。
+
+### 问题
+外场测试时虽然人和机器人都在室外，但日志里发现导航实际加载的是：
+- `config/waypoints_data.yaml`
+而不是：
+- `config/waypoints_real_gps.yaml`
+
+### 风险
+- 这会导致“人在室外，但导航仍在跑本地平面 waypoint”；
+- 后续抓到的摇摆日志会混淆“真实 GPS 室外问题”和“本地 waypoint/非 GPS 模式问题”；
+- 不符合项目里“室外真实 GPS 测试”的目标。
+
+### 修复
+- 在 `scripts/start_all_services.sh` 中增加强制逻辑：
+- 只要 `USE_GPS=true`，且 `WAYPOINTS_FILE` 未显式指定，就自动设置为 `config/waypoints_real_gps.yaml`
+- 同时拒绝 `config/waypoints_data.yaml` 在 GPS 模式下被使用
+- `test` 模式下额外强制：
+- `USE_GPS=true`
+- `USE_NMEA_GPS=true`
+- `USE_SIM_TIME=false`
+- 在 `launch/navigation.launch.py` 中增加第二层防呆：
+- 若 `use_gps=true` 且传入的是 `waypoints_data.yaml`，直接抛错，不允许悄悄进入错误模式
+
+### 结果
+- 现在外场 GPS 启动链路默认只会走真实 GPS waypoint 文件；
+- 即使有人手工传入 `waypoints_data.yaml`，GPS 模式下也会被明确拒绝；
+- 这样后续录到的外场日志才可判定为真正的 GPS 室外导航数据。
+
+### 问题
+新的外场日志包显示：系统已经跑在真实 GPS 室外链路上，但机器人仍会“前进一点点，然后持续左右摇摆”，且不是单纯完全不走。
+
+### 证据
+- `path_follower_waypoints_file.txt` 指向：
+- `config/waypoints_real_gps.yaml`
+- `nav_status_once.txt` 为：
+- `GPS_READY`
+- `control_mode_once.txt` 为：
+- `AUTO`
+- `waypoint_status_once.txt` 为：
+- `NAVIGATING`
+- 这说明该包确实是外场 GPS 模式下的有效导航记录，不再是误跑本地 waypoint 文件。
+
+### 日志结论
+- `/deadman_ok` 在摇摆阶段持续为 `True`，不是 deadman 丢失导致停走停走。
+- `/emergency_stop` 在摇摆开始时为 `False`，后段才有 `True`，所以急停不是初始根因。
+- `/nav/status` 在摇摆开始阶段保持 `GPS_READY`，不是 GPS 丢失后才开始出问题。
+- `/cmd_vel_auto` 和 `/cmd_vel_safe` 前段确实会给 `linear.x = 0.4`，说明系统最开始允许向前推进。
+- 之后 `/cmd_vel_auto.angular.z` 正负方向切换很多次，`/cmd_vel_safe` 也同步切换，说明摆头是导航层自己在输出，而不是安全层单独改写。
+- `/local_target` 与 `/gap/local_target` 轨迹本身没有出现那种“左右大幅反复跳边”的特征；至少从 odom 坐标看，没有出现频繁左右跨侧的简单模式。
+
+### 判断
+- 这次外场摇摆的主嫌疑不再是：
+- `waypoints_data.yaml` 误用
+- deadman 抖动
+- 初始急停
+- 后方 local target 抢控制
+- 更值得优先怀疑的是：
+- 机器人姿态估计与局部目标/全局目标之间的相对方位解释不稳定
+- 换句话说，问题更像“目标没有明显乱跳，但控制器对目标方向的判断在来回改判”。
+
+### 当前优先级
+1. 优先怀疑 `/nav/odom` 的 yaw / 朝向解释链路
+2. 其次怀疑 GPS/odom 融合后的朝向与真实车头不一致
+3. 再其次才是局部规划本身在特殊位置造成的抖动
+
+### 下一步建议
+- 后续日志脚本应继续保留：
+- `/nav/odom`
+- `/local_target`
+- `/gap/local_target`
+- `/cmd_vel_auto`
+- `/cmd_vel_safe`
+- 并建议额外加入：
+- `/odom`
+- `/imu/data`
+- 这样可以直接判断是融合姿态问题，还是 path_follower / local planner 的目标解释问题。
+
+### 问题
+用户进一步询问：当前外场导航里，“轮速/odom 有没有融合 IMU”，以及当前摇摆是否可能由融合导致。
+
+### 代码结论
+- 原始 `/odom` 不是本仓库自己和 IMU 融合出来的结果；导航栈把它当作“底盘原始 odom 输入”使用。
+- 真正的室外融合发生在 `auto_nav/navigation/outdoor_pose_fuser.py`：
+- 位置：
+- 先使用原始 `/odom` 的位移增量推进 `nav_x/nav_y`
+- 再用 GPS fix 通过 `gps_position_alpha` 做位置回拉
+- 朝向：
+- 若 `config/gps.yaml` 中 `use_imu_yaw=true`，则优先使用 `/imu/data` 的 yaw
+- 否则退回使用原始 `/odom` 里的 yaw
+- 然后叠加 odom-to-ENU 的 `heading_offset`
+- 因此：外场 GPS 模式下，`/nav/odom` 的朝向确实会受到 IMU 影响。
+
+### 判断
+- 是的，当前外场融合链路里，IMU 很可能会影响最终导航朝向；
+- 如果 IMU yaw 本身有漂移、跳变、磁干扰，或者 heading offset 学偏，就可能表现为“前进一点后左右摆头”。
+- 所以“融合导致的”是一个高优先级怀疑方向，不是次要因素。
+
+### 处理
+- 为了下一包能直接验证这一点，更新了 `scripts/record_gps_debug.sh`：
+- rosbag 录制新增：
+- `/odom`
+- `/imu/data`
+- 一次性快照新增：
+- `imu_data_once.txt`
+- `odom_once.txt`
+
+### 结果
+- 下一次外场录包后，可以直接对比：
+- 原始 `/odom`
+- 原始 `/imu/data`
+- 融合后的 `/nav/odom`
+- 从而判断是 IMU 源、原始 odom，还是 outdoor_pose_fuser 的融合逻辑在放大摆头。
+
+### 问题
+补录 `/odom` 和 `/imu/data` 后，新的外场日志需要确认：当前摇摆是否真的是 IMU 融合导致。
+
+### 结论
+- 这次包里 `/imu/data` 话题被列入录制，但 `imu_data_once.txt` 没有任何消息；
+- 说明本次测试里虽然 topic 名存在于图上，但并没有实际收到 `/imu/data` 消息；
+- 因此这次外场运行时，`outdoor_pose_fuser` 很可能没有拿到 IMU yaw，而是退回使用原始 `/odom` 朝向。
+
+### 依据
+- `config/gps.yaml` 中 `use_imu_yaw=true`
+- 但 `auto_nav/navigation/outdoor_pose_fuser.py` 的实现是：
+- 有 IMU yaw 就优先用 IMU yaw
+- 没有 IMU yaw 就退回 `_last_raw_yaw`
+- 这次快照里：
+- `imu_data_once.txt` 为空
+- `odom_once.txt` 与 `nav_odom_once.txt` 的 orientation 完全一致
+- 同时 twist 中的 `linear.x` / `angular.z` 也一致
+- 这说明在该时刻，融合器并没有在朝向上明显改写原始 odom。
+
+### 判断
+- 所以“本次外场摇摆主要由 IMU 融合导致”这个说法，目前证据不足；
+- 更准确地说，这次更像是：
+- IMU 数据没有真正进入融合链路
+- 导航主要在用原始 odom yaw
+- 因此下一步应优先排查：
+- 为什么 `/imu/data` 没有实际消息
+- 原始 `/odom` 朝向本身是否稳定
+- GPS 融合在无 IMU yaw 时是否还在放大 heading offset 误差
+
+### 问题
+这个项目怎么在 `rviz2` 里看 bag？应该配置哪些 topic？
+
+### 现有基础
+- 仓库已经自带 RViz 配置文件：
+- `auto_nav/simulation/sim_bringup/rviz_config.rviz`
+- 这个配置默认打开了：
+- `TF`
+- `RobotModel`
+- `LaserScan` → `/scan`
+- `Odometry` → `/odom`
+- `Image` → `/camera/color/image_raw`
+- `Fixed Frame` 设为：
+- `odom`
+
+### 最小可视化链路
+- 如果 bag 是本地/仿真 odom 模式，优先保证这些 topic 在包里：
+- `/tf`
+- `/odom`
+- `/scan`
+- `/camera/color/image_raw`
+- `/camera/color/camera_info`
+- 如果 bag 是 GPS 模式，导航节点实际可能使用：
+- `/nav/odom`
+- `/nav/status`
+- 但 RViz 的 `Fixed Frame` 仍建议先用：
+- `odom`
+- 因为项目的 TF 发布仍是 `odom -> base_link`。
+
+### 建议在 RViz2 里加的显示项
+- 必开：
+- `TF`：看 `odom -> base_link -> laser/camera_link` 是否完整。
+- `Odometry`：topic 选 `/odom`；若回放的是 GPS 模式融合结果，可再加一个 `Odometry` 显示 `/nav/odom` 做对比。
+- `LaserScan`：topic 选 `/scan`。
+- `Image`：topic 选 `/camera/color/image_raw`。
+- 建议加：
+- `Pose` 或 `Marker` 类暂时不是首选，因为项目里的 `/marker/detection` 是 `geometry_msgs/PoseStamped`，更适合用 `Pose` 显示观察 cone 检测位置。
+- 再加 4 个 `Pose` 显示做导航调试：
+- `/waypoint/current`
+- `/local_target`
+- `/gap/local_target`
+- `/weave/local_target`
+
+### 推荐录包 topic 清单
+- 如果你是为了“回放时能看清机器人、雷达、相机、导航中间量”，建议至少录：
+- `/tf`
+- `/tf_static`
+- `/odom`
+- `/scan`
+- `/camera/color/image_raw`
+- `/camera/color/camera_info`
+- `/control_mode`
+- `/deadman_ok`
+- `/emergency_stop`
+- `/cmd_vel_auto`
+- `/cmd_vel_safe`
+- `/waypoint/current`
+- `/waypoint/status`
+- `/navigation/segment`
+- `/local_target`
+- `/gap/local_target`
+- `/weave/local_target`
+- `/mission/home_pose`
+- 如果你跑的是 GPS 室外模式，再额外录：
+- `/fix`
+- `/imu/data`
+- `/nav/odom`
+- `/nav/status`
+- 如果你还要看 cone / perception，补上：
+- `/marker/detection`
+- `/marker/bbox`
+- `/object/detection`
+- `/perception/distance`
+
+### 实际使用方法
+- 先回放 bag：
+- `ros2 bag play <你的bag目录> --clock`
+- 再开 RViz：
+- `rviz2 -d install/auto_nav/share/auto_nav/simulation/sim_bringup/rviz_config.rviz`
+- 如果你还没 `colcon build`，也可以直接用源码里的配置：
+- `rviz2 -d auto_nav/simulation/sim_bringup/rviz_config.rviz`
+- 若回放 GPS bag，建议在现有配置基础上手动再加一个 `Odometry` 显示到 `/nav/odom`，以及 4 个 `Pose` 显示到：
+- `/waypoint/current`
+- `/local_target`
+- `/gap/local_target`
+- `/weave/local_target`
+
+### 判断标准
+- `TF` 树正常时，应能看到至少：
+- `odom -> base_link`
+- `base_link -> laser`
+- `base_link -> camera_link`
+- `LaserScan` 能贴着机器人前方展开，说明 `/scan` 和 TF 对齐基本正常。
+- `Odometry(/odom 或 /nav/odom)` 轨迹能连续移动，说明定位消息在回放。
+- `Image(/camera/color/image_raw)` 能出图，说明相机 topic 录进去了。
+- `Pose(/local_target /gap/local_target /weave/local_target)` 能看到时，才适合继续查“为什么车会左右摇摆”这类导航问题。

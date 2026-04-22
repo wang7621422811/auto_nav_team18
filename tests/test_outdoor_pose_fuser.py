@@ -214,6 +214,9 @@ def _make_node(
     jump_reject_m: float = 8.0,
     fix_timeout_s: float = 2.0,
     use_imu_yaw: bool = True,
+    imu_yaw_offset_deg: float = 0.0,
+    heading_align_min_dist_m: float = 2.0,
+    heading_align_alpha: float = 0.25,
 ) -> OutdoorPoseFuserNode:
     node = OutdoorPoseFuserNode.__new__(OutdoorPoseFuserNode)
 
@@ -221,7 +224,10 @@ def _make_node(
     node._gps_jump_reject_m = jump_reject_m
     node._fix_timeout_s = fix_timeout_s
     node._use_imu_yaw = use_imu_yaw
+    node._imu_yaw_offset = math.radians(imu_yaw_offset_deg)
     node._align_on_first_fix = True
+    node._heading_align_min_dist_m = heading_align_min_dist_m
+    node._heading_align_alpha = heading_align_alpha
     node._publish_tf = True
 
     node._localizer = GeoLocalizer()
@@ -231,6 +237,7 @@ def _make_node(
     node._last_raw_odom_x = None
     node._last_raw_odom_y = None
     node._imu_yaw = None
+    node._last_raw_yaw = None
     node._nav_x = None
     node._nav_y = None
 
@@ -239,6 +246,8 @@ def _make_node(
     node._gps_init_n = None
     node._odom_init_x = None
     node._odom_init_y = None
+    node._heading_offset = 0.0
+    node._heading_aligned = False
     node._last_valid_fix_time = None
     node._state = NavState.WAITING_FOR_FIX
 
@@ -314,25 +323,26 @@ class TestOutdoorPoseFuser(unittest.TestCase):
         self.assertTrue(node._aligned)
         self.assertAlmostEqual(node._odom_init_x, 10.0)
         self.assertAlmostEqual(node._odom_init_y, 5.0)
-        self.assertAlmostEqual(nav_msg.pose.pose.position.x, 10.0)
-        self.assertAlmostEqual(nav_msg.pose.pose.position.y, 5.0)
+        self.assertAlmostEqual(nav_msg.pose.pose.position.x, 0.0)
+        self.assertAlmostEqual(nav_msg.pose.pose.position.y, 0.0)
         self.assertEqual(_last_status(node), NavState.GPS_ALIGNING.value)
 
     def test_aligned_fix_uses_odom_aligned_enu_coordinates(self):
-        node = _make_node(alpha=1.0, jump_reject_m=20.0)
+        node = _make_node(alpha=1.0, jump_reject_m=20.0, use_imu_yaw=False)
         origin_lat = 51.4788
         origin_lon = -0.0106
 
         node._odom_cb(_make_odom(4.0, 6.0))
         node._fix_cb(_make_fix(origin_lat, origin_lon))
 
+        node._odom_cb(_make_odom(14.0, 6.0, yaw=0.0))
         east_lon = _lon_for_east_m(origin_lat, origin_lon, 10.0)
         node._clock_s = 0.1
         node._fix_cb(_make_fix(origin_lat, east_lon))
 
         nav_msg = _last_nav_msg(node)
-        self.assertAlmostEqual(nav_msg.pose.pose.position.x, 14.0, places=3)
-        self.assertAlmostEqual(nav_msg.pose.pose.position.y, 6.0, places=3)
+        self.assertAlmostEqual(nav_msg.pose.pose.position.x, 10.0, places=3)
+        self.assertAlmostEqual(nav_msg.pose.pose.position.y, 0.0, places=3)
         self.assertEqual(_last_status(node), NavState.GPS_READY.value)
 
     def test_invalid_fix_falls_back_to_odom_plus_imu_yaw(self):
@@ -354,28 +364,73 @@ class TestOutdoorPoseFuser(unittest.TestCase):
         self.assertAlmostEqual(fused_yaw, 1.2, places=3)
         self.assertEqual(node._state, NavState.ODOM_IMU_ONLY)
 
+    def test_imu_yaw_offset_is_applied_before_fusing_orientation(self):
+        node = _make_node(use_imu_yaw=True, imu_yaw_offset_deg=180.0)
+
+        node._imu_cb(_make_imu(yaw=math.radians(40.0)))
+        node._odom_cb(_make_odom(1.0, 2.0, yaw=0.0))
+
+        nav_msg = _last_nav_msg(node)
+        fused_yaw = _quat_to_yaw(
+            nav_msg.pose.pose.orientation.x,
+            nav_msg.pose.pose.orientation.y,
+            nav_msg.pose.pose.orientation.z,
+            nav_msg.pose.pose.orientation.w,
+        )
+        self.assertAlmostEqual(math.degrees(fused_yaw), -140.0, places=3)
+
     def test_valid_fix_recovery_returns_smoothly_after_timeout(self):
-        node = _make_node(alpha=0.5, jump_reject_m=20.0, fix_timeout_s=1.0)
+        node = _make_node(alpha=0.5, jump_reject_m=20.0, fix_timeout_s=1.0, use_imu_yaw=False)
         origin_lat = 51.4788
         origin_lon = -0.0106
 
         node._odom_cb(_make_odom(0.0, 0.0))
         node._fix_cb(_make_fix(origin_lat, origin_lon))
 
+        node._odom_cb(_make_odom(10.0, 0.0, yaw=0.0))
         east_lon = _lon_for_east_m(origin_lat, origin_lon, 10.0)
         node._clock_s = 0.2
         node._fix_cb(_make_fix(origin_lat, east_lon))
-        self.assertAlmostEqual(_last_nav_msg(node).pose.pose.position.x, 5.0, places=3)
+        self.assertAlmostEqual(_last_nav_msg(node).pose.pose.position.x, 10.0, places=3)
 
         node._clock_s = 2.0
-        node._odom_cb(_make_odom(1.0, 0.0))
+        node._odom_cb(_make_odom(12.0, 0.0, yaw=0.0))
         self.assertEqual(_last_status(node), NavState.GPS_LOST.value)
-        self.assertAlmostEqual(_last_nav_msg(node).pose.pose.position.x, 6.0, places=3)
+        self.assertAlmostEqual(_last_nav_msg(node).pose.pose.position.x, 12.0, places=3)
 
         node._clock_s = 2.1
         node._fix_cb(_make_fix(origin_lat, east_lon))
         self.assertEqual(_last_status(node), NavState.GPS_READY.value)
-        self.assertAlmostEqual(_last_nav_msg(node).pose.pose.position.x, 8.0, places=3)
+        self.assertAlmostEqual(_last_nav_msg(node).pose.pose.position.x, 11.0, places=3)
+
+    def test_heading_alignment_rotates_odom_motion_and_yaw_into_enu(self):
+        node = _make_node(alpha=1.0, jump_reject_m=20.0, use_imu_yaw=False)
+        origin_lat = 51.4788
+        origin_lon = -0.0106
+
+        node._odom_cb(_make_odom(0.0, 0.0, yaw=math.pi / 2.0))
+        node._fix_cb(_make_fix(origin_lat, origin_lon))
+
+        node._odom_cb(_make_odom(0.0, 10.0, yaw=math.pi / 2.0))
+        east_lon = _lon_for_east_m(origin_lat, origin_lon, 10.0)
+        node._clock_s = 0.1
+        node._fix_cb(_make_fix(origin_lat, east_lon))
+
+        self.assertTrue(node._heading_aligned)
+        self.assertAlmostEqual(node._heading_offset, -math.pi / 2.0, places=3)
+
+        node._clock_s = 0.2
+        node._odom_cb(_make_odom(0.0, 20.0, yaw=math.pi / 2.0))
+        nav_msg = _last_nav_msg(node)
+        fused_yaw = _quat_to_yaw(
+            nav_msg.pose.pose.orientation.x,
+            nav_msg.pose.pose.orientation.y,
+            nav_msg.pose.pose.orientation.z,
+            nav_msg.pose.pose.orientation.w,
+        )
+        self.assertAlmostEqual(nav_msg.pose.pose.position.x, 20.0, places=3)
+        self.assertAlmostEqual(nav_msg.pose.pose.position.y, 0.0, places=3)
+        self.assertAlmostEqual(fused_yaw, 0.0, places=3)
 
     def test_tf_matches_published_nav_odom(self):
         node = _make_node(alpha=1.0)

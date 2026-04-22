@@ -68,20 +68,30 @@
 2. `outdoor_pose_fuser` 在拿到**第一个有效 GPS fix**时，记录：
   - `gps_init_e, gps_init_n`
   - `odom_init_x, odom_init_y`
-3. 之后每个 GPS 点先转成 ENU，再做平移对齐：
+3. `/nav/odom` 的位置最终统一发布到 waypoint 共用的 ENU 平面：
 
 ```text
-aligned_x = odom_init_x + (gps_e - gps_init_e)
-aligned_y = odom_init_y + (gps_n - gps_init_n)
+nav_x = gps_e
+nav_y = gps_n
 ```
 
-这样就把 GPS 世界坐标平移到了机器人启动时的 odom 局部坐标系里。
+4. wheel odom 仍然负责 GPS 两帧之间的连续传播，但传播前必须先估计
+   `raw odom -> ENU` 的固定旋转偏角。做法是对比“从首个 fix 到当前时刻”的：
+  - GPS 位移方向 `atan2(gps_n - gps_init_n, gps_e - gps_init_e)`
+  - raw odom 位移方向 `atan2(odom_y - odom_init_y, odom_x - odom_init_x)`
+
+```text
+heading_offset = gps_track_heading - odom_track_heading
+delta_nav = R(heading_offset) * delta_odom
+```
+
+这样 waypoint、融合后位置、控制器使用的 yaw 才落在同一个 ENU 参考系里。
 
 结果是：
 
-- 导航目标 waypoint 和机器人当前位姿在同一个平面坐标系中
+- 导航目标 waypoint 和机器人当前位姿在同一个 ENU 平面坐标系中
 - 不要求机器人起点刚好等于 `origin`
-- 保留现有导航节点对“平面 x/y 坐标”的假设
+- 保留现有导航节点对“平面 x/y + yaw”闭环的假设
 
 这一步是最终版本里必须明确实现的。
 
@@ -192,10 +202,12 @@ remappings=[('/odom', '/nav/odom')]
 2. GPS 转 ENU
   复用现有 `GeoLocalizer`
 3. 启动对齐
-  首个有效 fix 与当前 odom 建立平移偏置
-4. 平滑融合
+  首个有效 fix 锚定 ENU 位置，并记录 raw odom 锚点
+4. 航向对齐
+  用 GPS 轨迹方向与 odom 轨迹方向估计固定 heading 偏角
+5. 平滑融合
   防止 GPS 抖动导致位置突跳
-5. fallback
+6. fallback
   没 fix 时退化成 odom+imu
 
 ---
@@ -215,6 +227,8 @@ remappings=[('/odom', '/nav/odom')]
 - `fix_timeout_s: 2.0`
 - `use_imu_yaw: true`
 - `align_on_first_valid_fix: true`
+- `heading_alignment_min_dist_m: 2.0`
+- `heading_alignment_alpha: 0.25`
 
 导航参数：
 

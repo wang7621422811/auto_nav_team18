@@ -60,6 +60,22 @@ class _FakeNode:
         self.remappings = kwargs.get('remappings', [])
 
 
+class _FakeComposableNode:
+    def __init__(self, **kwargs):
+        self.package = kwargs.get('package')
+        self.plugin = kwargs.get('plugin')
+        self.name = kwargs.get('name')
+        self.parameters = kwargs.get('parameters', [])
+        self.remappings = kwargs.get('remappings', [])
+
+
+class _FakeComposableNodeContainer(_FakeNode):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.namespace = kwargs.get('namespace', '')
+        self.composable_node_descriptions = kwargs.get('composable_node_descriptions', [])
+
+
 def _install_launch_stubs() -> None:
     """Stub ROS-only modules so the launch file can be imported under pytest."""
     launch_mod = types.ModuleType('launch')
@@ -76,13 +92,17 @@ def _install_launch_stubs() -> None:
     launch_ros_mod = types.ModuleType('launch_ros')
     launch_ros_actions_mod = types.ModuleType('launch_ros.actions')
     launch_ros_actions_mod.Node = _FakeNode
+    launch_ros_actions_mod.ComposableNodeContainer = _FakeComposableNodeContainer
+    launch_ros_descriptions_mod = types.ModuleType('launch_ros.descriptions')
+    launch_ros_descriptions_mod.ComposableNode = _FakeComposableNode
     launch_ros_mod.actions = launch_ros_actions_mod
+    launch_ros_mod.descriptions = launch_ros_descriptions_mod
 
     ament_mod = types.ModuleType('ament_index_python')
     ament_packages_mod = types.ModuleType('ament_index_python.packages')
 
     def _fake_get_package_share_directory(name: str) -> str:
-        if name != 'auto_nav':
+        if name not in {'auto_nav', 'phidgets_spatial'}:
             raise KeyError(name)
         return str(_ROOT)
 
@@ -94,6 +114,7 @@ def _install_launch_stubs() -> None:
     sys.modules['launch.substitutions'] = substitutions_mod
     sys.modules['launch_ros'] = launch_ros_mod
     sys.modules['launch_ros.actions'] = launch_ros_actions_mod
+    sys.modules['launch_ros.descriptions'] = launch_ros_descriptions_mod
     sys.modules['ament_index_python'] = ament_mod
     sys.modules['ament_index_python.packages'] = ament_packages_mod
 
@@ -136,7 +157,7 @@ def test_bringup_launch_publishes_static_sensor_tf_chain() -> None:
     nodes = static_tf_op.function(context)
     by_name = {node.name: node for node in nodes}
 
-    assert set(by_name) == {'tf_base_to_laser', 'tf_base_to_camera'}
+    assert set(by_name) == {'tf_base_to_laser', 'tf_base_to_camera', 'tf_base_to_imu'}
 
     expected_xyz = load_sensor_xyz_from_files(
         [_ROOT / 'config' / 'robot.yaml', _ROOT / 'config' / 'real.yaml']
@@ -168,6 +189,20 @@ def test_bringup_launch_publishes_static_sensor_tf_chain() -> None:
         '0.0',
         'base_link',
         'camera_link',
+    ]
+
+    imu_node = by_name['tf_base_to_imu']
+    assert imu_node.package == 'tf2_ros'
+    assert imu_node.executable == 'static_transform_publisher'
+    assert imu_node.arguments == [
+        str(expected_xyz['imu'][0]),
+        str(expected_xyz['imu'][1]),
+        str(expected_xyz['imu'][2]),
+        '0.0',
+        '0.0',
+        '0.0',
+        'base_link',
+        'imu_link',
     ]
 
 
@@ -272,6 +307,47 @@ def test_bringup_launch_can_start_nmea_gps_driver() -> None:
     }]
 
 
+def test_bringup_launch_can_start_phidget_imu_driver() -> None:
+    module = _load_launch_module('bringup.launch.py')
+    launch_description = module.generate_launch_description()
+
+    imu_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_imu_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={
+            'use_imu': 'true',
+            'imu_serial': '123456',
+            'imu_hub_port': '2',
+            'use_sim_time': 'false',
+        }
+    )
+    nodes = imu_op.function(context)
+    assert len(nodes) == 1
+
+    imu_container = nodes[0]
+    assert imu_container.package == 'rclcpp_components'
+    assert imu_container.executable == 'component_container'
+    assert imu_container.name == 'phidgets_spatial_container'
+    assert len(imu_container.composable_node_descriptions) == 1
+
+    imu_component = imu_container.composable_node_descriptions[0]
+    assert imu_component.package == 'phidgets_spatial'
+    assert imu_component.plugin == 'phidgets::SpatialRosI'
+    assert imu_component.name == 'phidgets_spatial'
+    assert ('imu/data_raw', '/imu/data') in imu_component.remappings
+    assert any(
+        isinstance(params, dict)
+        and params.get('serial') == 123456
+        and params.get('hub_port') == 2
+        and params.get('use_sim_time') is False
+        for params in imu_component.parameters
+    )
+
+
 def test_bringup_launch_isolates_vendor_sick_tf_from_main_tree() -> None:
     module = _load_launch_module('bringup.launch.py')
     launch_description = module.generate_launch_description()
@@ -362,6 +438,32 @@ def test_navigation_launch_defaults_to_local_waypoints_without_gps() -> None:
         'waypoints_file': str(_ROOT / 'config' / 'waypoints_data.yaml'),
         'use_sim_time': False,
     } in path_param_overrides
+
+
+def test_navigation_launch_rejects_local_waypoints_in_gps_mode() -> None:
+    module = _load_launch_module('navigation.launch.py')
+    launch_description = module.generate_launch_description()
+
+    nav_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_navigation_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={
+            'use_gps': 'true',
+            'use_sim_time': 'false',
+            'waypoints_file': str(_ROOT / 'config' / 'waypoints_data.yaml'),
+        }
+    )
+
+    try:
+        nav_op.function(context)
+    except ValueError as exc:
+        assert 'GPS mode requires a real outdoor waypoint file' in str(exc)
+    else:
+        raise AssertionError('Expected GPS mode to reject local waypoint file')
 
 
 def test_navigation_launch_loads_robot_params_before_waypoint_params() -> None:

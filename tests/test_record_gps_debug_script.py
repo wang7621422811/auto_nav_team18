@@ -25,6 +25,8 @@ def test_record_script_uses_rosbag_for_key_navigation_topics() -> None:
     assert "/deadman_ok" in content
     assert "/emergency_stop" in content
     assert "/fix" in content
+    assert "/imu/data" in content
+    assert "/odom" in content
     assert "/nav/status" in content
     assert "/nav/odom" in content
     assert "/waypoint/current" in content
@@ -45,6 +47,8 @@ def test_record_script_saves_snapshots_and_archive() -> None:
     assert 'write_snapshot "${LOG_DIR}/path_follower_waypoints_file.txt" ros2 param get /path_follower waypoints_file' in content
     assert 'write_snapshot "${LOG_DIR}/path_follower_use_gps.txt" ros2 param get /path_follower use_gps' in content
     assert 'start_background_snapshot "${LOG_DIR}/control_mode_once.txt" ros2 topic echo --once /control_mode' in content
+    assert 'start_background_snapshot "${LOG_DIR}/imu_data_once.txt" ros2 topic echo --once /imu/data' in content
+    assert 'start_background_snapshot "${LOG_DIR}/odom_once.txt" ros2 topic echo --once /odom' in content
     assert 'start_background_snapshot "${LOG_DIR}/nav_status_once.txt" ros2 topic echo --once /nav/status' in content
     assert 'tar -czf "${ARCHIVE_PATH}"' in content
 

@@ -1,0 +1,16 @@
+# Real Phidget Spatial 3/3/3 IMU configuration.
+#
+# The official ROS 2 driver publishes /imu/data_raw by default. bringup.launch.py
+# remaps that stream onto the project-wide /imu/data API so downstream nodes do
+# not need Phidgets-specific topic names.
+
+/**:
+  ros__parameters:
+    serial: -1                  # -1 = connect to any attached Spatial
+    hub_port: 0                 # only used when connected via a VINT hub
+    frame_id: "imu_link"
+    use_orientation: true       # required so outdoor_pose_fuser can read yaw
+    spatial_algorithm: "ahrs"
+    data_interval_ms: 8
+    callback_delta_epsilon_ms: 1
+    publish_rate: 0.0           # 0 = publish every driver update

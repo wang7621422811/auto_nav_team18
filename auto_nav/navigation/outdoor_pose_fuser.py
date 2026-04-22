@@ -4,9 +4,11 @@
 This node implements the GPS-mode design from ``docs/steps/gps_function.md``:
 
 1. GPS fixes are converted into a shared ENU frame with ``GeoLocalizer``.
-2. The first valid fix is aligned to the robot's current odom pose.
-3. Wheel odometry keeps the pose continuous between GPS updates.
-4. Accepted GPS fixes pull the pose back toward the aligned GPS position.
+2. The first valid fix anchors the raw odom stream to the shared ENU frame.
+3. Wheel-odom deltas are rotated into ENU once enough motion exists to learn the
+   odom-to-ENU heading offset.
+4. Accepted GPS fixes pull the fused pose back toward the ENU-aligned GPS
+   position while refining that heading offset.
 5. The node publishes both ``/nav/odom`` and a matching ``odom -> base_link`` TF.
 
 The implementation intentionally stays lightweight: no EKF, no extra
@@ -61,7 +63,10 @@ class OutdoorPoseFuserNode(Node):
         self.declare_parameter('gps_jump_reject_m', 8.0)
         self.declare_parameter('fix_timeout_s', 2.0)
         self.declare_parameter('use_imu_yaw', True)
+        self.declare_parameter('imu_yaw_offset_deg', 0.0)
         self.declare_parameter('align_on_first_valid_fix', True)
+        self.declare_parameter('heading_alignment_min_dist_m', 2.0)
+        self.declare_parameter('heading_alignment_alpha', 0.25)
 
         def _str(name: str) -> str:
             return self.get_parameter(name).get_parameter_value().string_value
@@ -83,7 +88,10 @@ class OutdoorPoseFuserNode(Node):
         self._gps_jump_reject_m = _dbl('gps_jump_reject_m')
         self._fix_timeout_s = _dbl('fix_timeout_s')
         self._use_imu_yaw = _bool('use_imu_yaw')
+        self._imu_yaw_offset = math.radians(_dbl('imu_yaw_offset_deg'))
         self._align_on_first_fix = _bool('align_on_first_valid_fix')
+        self._heading_align_min_dist_m = max(_dbl('heading_alignment_min_dist_m'), 0.0)
+        self._heading_align_alpha = min(max(_dbl('heading_alignment_alpha'), 0.0), 1.0)
 
         self._localizer = GeoLocalizer()
         self._localizer.set_origin(
@@ -96,6 +104,7 @@ class OutdoorPoseFuserNode(Node):
         self._last_raw_odom_x: float | None = None
         self._last_raw_odom_y: float | None = None
         self._imu_yaw: float | None = None
+        self._last_raw_yaw: float | None = None
 
         # Fused navigation pose
         self._nav_x: float | None = None
@@ -107,6 +116,8 @@ class OutdoorPoseFuserNode(Node):
         self._gps_init_n: float | None = None
         self._odom_init_x: float | None = None
         self._odom_init_y: float | None = None
+        self._heading_offset: float = 0.0
+        self._heading_aligned = False
         self._last_valid_fix_time: float | None = None
 
         self._state = NavState.WAITING_FOR_FIX
@@ -144,15 +155,27 @@ class OutdoorPoseFuserNode(Node):
         raw_x = msg.pose.pose.position.x
         raw_y = msg.pose.pose.position.y
 
+        raw_yaw = _quat_to_yaw(
+            msg.pose.pose.orientation.x,
+            msg.pose.pose.orientation.y,
+            msg.pose.pose.orientation.z,
+            msg.pose.pose.orientation.w,
+        )
+
         if self._nav_x is None or self._nav_y is None:
             self._nav_x = raw_x
             self._nav_y = raw_y
         elif self._last_raw_odom_x is not None and self._last_raw_odom_y is not None:
-            self._nav_x += raw_x - self._last_raw_odom_x
-            self._nav_y += raw_y - self._last_raw_odom_y
+            delta_x = raw_x - self._last_raw_odom_x
+            delta_y = raw_y - self._last_raw_odom_y
+            if self._aligned and self._heading_aligned:
+                delta_x, delta_y = _rotate_xy(delta_x, delta_y, self._heading_offset)
+            self._nav_x += delta_x
+            self._nav_y += delta_y
 
         self._last_raw_odom_x = raw_x
         self._last_raw_odom_y = raw_y
+        self._last_raw_yaw = raw_yaw
         self._last_odom_msg = msg
 
         if self._last_valid_fix_time is None:
@@ -167,7 +190,9 @@ class OutdoorPoseFuserNode(Node):
         q = msg.orientation
         if not _quat_is_finite(q.x, q.y, q.z, q.w):
             return
-        self._imu_yaw = _quat_to_yaw(q.x, q.y, q.z, q.w)
+        self._imu_yaw = _angle_wrap(
+            _quat_to_yaw(q.x, q.y, q.z, q.w) + self._imu_yaw_offset
+        )
 
     def _fix_cb(self, msg: NavSatFix) -> None:
         """Blend the fused pose back toward the aligned GPS position."""
@@ -189,12 +214,13 @@ class OutdoorPoseFuserNode(Node):
         if not self._aligned or self._gps_init_e is None or self._gps_init_n is None:
             return
 
-        target_x = self._odom_init_x + (east_m - self._gps_init_e)  # type: ignore[operator]
-        target_y = self._odom_init_y + (north_m - self._gps_init_n)  # type: ignore[operator]
-
         if self._nav_x is None or self._nav_y is None:
-            self._nav_x = self._last_odom_msg.pose.pose.position.x
-            self._nav_y = self._last_odom_msg.pose.pose.position.y
+            self._nav_x = east_m
+            self._nav_y = north_m
+
+        heading_aligned_now = self._update_heading_alignment(east_m, north_m)
+        target_x = east_m
+        target_y = north_m
 
         has_previous_fix = self._last_valid_fix_time is not None
         jump_m = math.hypot(target_x - self._nav_x, target_y - self._nav_y)
@@ -206,7 +232,11 @@ class OutdoorPoseFuserNode(Node):
             )
             return
 
-        self._blend_toward(target_x, target_y, force=not has_previous_fix)
+        self._blend_toward(
+            target_x,
+            target_y,
+            force=(not has_previous_fix) or heading_aligned_now,
+        )
         self._last_valid_fix_time = self._now_s()
         self._set_state(NavState.GPS_READY if has_previous_fix else NavState.GPS_ALIGNING)
 
@@ -217,7 +247,7 @@ class OutdoorPoseFuserNode(Node):
     # ------------------------------------------------------------------
 
     def _initialise_alignment(self, east_m: float, north_m: float) -> None:
-        """Align the first valid GPS fix to the current odom position."""
+        """Anchor the raw odom stream to the shared GPS ENU frame."""
         if self._last_odom_msg is None:
             return
 
@@ -230,15 +260,53 @@ class OutdoorPoseFuserNode(Node):
         else:
             self._gps_init_e = 0.0
             self._gps_init_n = 0.0
-            self._odom_init_x = 0.0
-            self._odom_init_y = 0.0
+            self._odom_init_x = raw_pose.position.x
+            self._odom_init_y = raw_pose.position.y
 
         self._aligned = True
+        self._nav_x = east_m
+        self._nav_y = north_m
         self.get_logger().info(
             'GPS alignment initialised at '
-            f'odom=({self._odom_init_x:.2f}, {self._odom_init_y:.2f})  '
             f'enu=({east_m:.2f}, {north_m:.2f})'
         )
+
+    def _update_heading_alignment(self, east_m: float, north_m: float) -> bool:
+        """Estimate the raw-odom to ENU heading offset from observed motion."""
+        if (
+            self._odom_init_x is None
+            or self._odom_init_y is None
+            or self._last_odom_msg is None
+            or self._gps_init_e is None
+            or self._gps_init_n is None
+        ):
+            return False
+
+        odom_dx = self._last_odom_msg.pose.pose.position.x - self._odom_init_x
+        odom_dy = self._last_odom_msg.pose.pose.position.y - self._odom_init_y
+        gps_dx = east_m - self._gps_init_e
+        gps_dy = north_m - self._gps_init_n
+
+        odom_dist = math.hypot(odom_dx, odom_dy)
+        gps_dist = math.hypot(gps_dx, gps_dy)
+        if min(odom_dist, gps_dist) < self._heading_align_min_dist_m:
+            return False
+
+        candidate = _angle_wrap(math.atan2(gps_dy, gps_dx) - math.atan2(odom_dy, odom_dx))
+        if not self._heading_aligned:
+            self._heading_offset = candidate
+            self._heading_aligned = True
+            self.get_logger().info(
+                'Heading alignment initialised  '
+                f'offset={self._heading_offset:.3f}rad'
+            )
+            return True
+
+        delta = _angle_wrap(candidate - self._heading_offset)
+        self._heading_offset = _angle_wrap(
+            self._heading_offset + self._heading_align_alpha * delta
+        )
+        return False
 
     def _blend_toward(self, target_x: float, target_y: float, *, force: bool) -> None:
         """Move the fused pose toward the GPS-aligned target."""
@@ -293,15 +361,22 @@ class OutdoorPoseFuserNode(Node):
             self._tf_pub.sendTransform(tf_msg)
 
     def _resolve_orientation(self, raw_orientation) -> tuple[float, float, float, float]:
-        """Pick IMU yaw when configured, otherwise keep the raw odom orientation."""
+        """Publish yaw in the same ENU frame used by the fused position."""
         if self._use_imu_yaw and self._imu_yaw is not None:
-            return _yaw_to_quat(self._imu_yaw)
-        return (
-            raw_orientation.x,
-            raw_orientation.y,
-            raw_orientation.z,
-            raw_orientation.w,
-        )
+            yaw = self._imu_yaw
+        elif self._last_raw_yaw is not None:
+            yaw = self._last_raw_yaw
+        else:
+            return (
+                raw_orientation.x,
+                raw_orientation.y,
+                raw_orientation.z,
+                raw_orientation.w,
+            )
+
+        if self._heading_aligned:
+            yaw = _angle_wrap(yaw + self._heading_offset)
+        return _yaw_to_quat(yaw)
 
     def _is_valid_fix(self, msg: NavSatFix) -> bool:
         """Accept fixes with a valid status and finite coordinates."""
@@ -346,6 +421,23 @@ def _quat_to_yaw(qx: float, qy: float, qz: float, qw: float) -> float:
 def _yaw_to_quat(yaw: float) -> tuple[float, float, float, float]:
     half = yaw * 0.5
     return (0.0, 0.0, math.sin(half), math.cos(half))
+
+
+def _rotate_xy(x: float, y: float, yaw: float) -> tuple[float, float]:
+    cos_yaw = math.cos(yaw)
+    sin_yaw = math.sin(yaw)
+    return (
+        x * cos_yaw - y * sin_yaw,
+        x * sin_yaw + y * cos_yaw,
+    )
+
+
+def _angle_wrap(angle: float) -> float:
+    while angle > math.pi:
+        angle -= 2.0 * math.pi
+    while angle < -math.pi:
+        angle += 2.0 * math.pi
+    return angle
 
 
 def _quat_is_finite(qx: float, qy: float, qz: float, qw: float) -> bool:

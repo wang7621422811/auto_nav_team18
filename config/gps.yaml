@@ -21,4 +21,8 @@ outdoor_pose_fuser:
     gps_jump_reject_m: 8.0
     fix_timeout_s: 2.0
     use_imu_yaw: true
+    # Real robot Phidget Spatial is currently mounted 180 deg opposite to base_link yaw.
+    imu_yaw_offset_deg: 180.0
     align_on_first_valid_fix: true
+    heading_alignment_min_dist_m: 2.0
+    heading_alignment_alpha: 0.25
