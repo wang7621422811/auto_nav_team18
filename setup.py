@@ -65,6 +65,7 @@ setup(
             'object_detector    = auto_nav.perception.object_detector:main',
             'distance_estimator = auto_nav.perception.distance_estimator:main',
             'photo_capture      = auto_nav.perception.photo_capture:main',
+            'oakd_camera        = auto_nav.perception.oakd_camera:main',
             # Step 5: mission state machine
             'mission_controller = auto_nav.mission.mission_controller:main',
             'journey_logger     = auto_nav.mission.journey_logger:main',

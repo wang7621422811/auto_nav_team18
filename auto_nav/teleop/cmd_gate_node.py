@@ -134,6 +134,9 @@ class CmdGateNode(Node):
         if self._estop:
             return _ZERO
 
+        if self._estop:
+            return self._reverse_escape_command()
+
         if self._mode == self.MANUAL:
             return self._cmd_manual
 
@@ -142,6 +145,26 @@ class CmdGateNode(Node):
 
         # PAUSED, ABORTED, or any other unsupported mode
         return _ZERO
+
+    def _reverse_escape_command(self) -> Twist:
+        """
+        While obstacle estop is active, allow the operator to back out manually.
+
+        This keeps the safety stop effective for all forward motion, but avoids
+        trapping the robot against a wall where the LiDAR continues to see the
+        obstacle inside the front safety sector.  Reverse escape is deliberately
+        restricted to MANUAL mode and strips angular velocity to keep the
+        behaviour predictable during recovery.
+        """
+        if self._mode != self.MANUAL:
+            return _ZERO
+
+        if self._cmd_manual.linear.x >= 0.0:
+            return _ZERO
+
+        out = Twist()
+        out.linear.x = self._cmd_manual.linear.x
+        return out
 
 
 def main(args=None):
