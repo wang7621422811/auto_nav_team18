@@ -61,7 +61,7 @@ LiDAR 安全距离
 底盘：给定的 ariaNode
 手柄：joy
 手动控制：teleop_twist_joy 可先用，再在外面加安全层
-相机：depthai-ros
+相机：参考auto_nav/teleop/oakd_camera.py
 TF：标准 tf2
 规则 E：每一步都必须产出 5 样东西
 

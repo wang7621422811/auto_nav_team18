@@ -1,0 +1,353 @@
+# Copyright 2026 team18
+"""Fuse GPS, IMU yaw, and wheel odometry into a navigation odometry stream.
+
+This node implements the GPS-mode design from ``docs/steps/gps_function.md``:
+
+1. GPS fixes are converted into a shared ENU frame with ``GeoLocalizer``.
+2. The first valid fix is aligned to the robot's current odom pose.
+3. Wheel odometry keeps the pose continuous between GPS updates.
+4. Accepted GPS fixes pull the pose back toward the aligned GPS position.
+5. The node publishes both ``/nav/odom`` and a matching ``odom -> base_link`` TF.
+
+The implementation intentionally stays lightweight: no EKF, no extra
+dependencies, and no changes to existing navigation-node interfaces.
+"""
+
+from __future__ import annotations
+
+import math
+from enum import Enum
+
+import rclpy
+from geometry_msgs.msg import TransformStamped
+from nav_msgs.msg import Odometry
+from rclpy.node import Node
+from sensor_msgs.msg import Imu, NavSatFix
+from std_msgs.msg import String
+from tf2_ros import TransformBroadcaster
+
+from .geo_localizer import GeoLocalizer
+
+
+class NavState(str, Enum):
+    """Published navigation-status values for GPS outdoor mode."""
+
+    WAITING_FOR_FIX = 'WAITING_FOR_FIX'
+    ODOM_IMU_ONLY = 'ODOM_IMU_ONLY'
+    GPS_ALIGNING = 'GPS_ALIGNING'
+    GPS_READY = 'GPS_READY'
+    GPS_LOST = 'GPS_LOST'
+
+
+class OutdoorPoseFuserNode(Node):
+    """Publish a GPS-aligned odometry stream for the existing navigation stack."""
+
+    def __init__(self) -> None:
+        super().__init__('outdoor_pose_fuser')
+
+        # Topic / publish configuration
+        self.declare_parameter('gps_fix_topic', '/fix')
+        self.declare_parameter('imu_topic', '/imu/data')
+        self.declare_parameter('odom_in_topic', '/odom')
+        self.declare_parameter('odom_out_topic', '/nav/odom')
+        self.declare_parameter('status_topic', '/nav/status')
+        self.declare_parameter('publish_tf', True)
+
+        # GPS fusion tuning
+        self.declare_parameter('gps_origin_lat', 51.4788)
+        self.declare_parameter('gps_origin_lon', -0.0106)
+        self.declare_parameter('gps_position_alpha', 0.1)
+        self.declare_parameter('gps_jump_reject_m', 8.0)
+        self.declare_parameter('fix_timeout_s', 2.0)
+        self.declare_parameter('use_imu_yaw', True)
+        self.declare_parameter('align_on_first_valid_fix', True)
+
+        def _str(name: str) -> str:
+            return self.get_parameter(name).get_parameter_value().string_value
+
+        def _dbl(name: str) -> float:
+            return self.get_parameter(name).get_parameter_value().double_value
+
+        def _bool(name: str) -> bool:
+            return self.get_parameter(name).get_parameter_value().bool_value
+
+        self._gps_fix_topic = _str('gps_fix_topic')
+        self._imu_topic = _str('imu_topic')
+        self._odom_in_topic = _str('odom_in_topic')
+        self._odom_out_topic = _str('odom_out_topic')
+        self._status_topic = _str('status_topic')
+        self._publish_tf = _bool('publish_tf')
+
+        self._gps_alpha = min(max(_dbl('gps_position_alpha'), 0.0), 1.0)
+        self._gps_jump_reject_m = _dbl('gps_jump_reject_m')
+        self._fix_timeout_s = _dbl('fix_timeout_s')
+        self._use_imu_yaw = _bool('use_imu_yaw')
+        self._align_on_first_fix = _bool('align_on_first_valid_fix')
+
+        self._localizer = GeoLocalizer()
+        self._localizer.set_origin(
+            _dbl('gps_origin_lat'),
+            _dbl('gps_origin_lon'),
+        )
+
+        # Raw sensor state
+        self._last_odom_msg: Odometry | None = None
+        self._last_raw_odom_x: float | None = None
+        self._last_raw_odom_y: float | None = None
+        self._imu_yaw: float | None = None
+
+        # Fused navigation pose
+        self._nav_x: float | None = None
+        self._nav_y: float | None = None
+
+        # GPS alignment state
+        self._aligned = False
+        self._gps_init_e: float | None = None
+        self._gps_init_n: float | None = None
+        self._odom_init_x: float | None = None
+        self._odom_init_y: float | None = None
+        self._last_valid_fix_time: float | None = None
+
+        self._state = NavState.WAITING_FOR_FIX
+
+        self._pub_odom = self.create_publisher(Odometry, self._odom_out_topic, 10)
+        self._pub_status = self.create_publisher(String, self._status_topic, 10)
+        self._tf_pub = TransformBroadcaster(self) if self._publish_tf else None
+
+        self.create_subscription(Odometry, self._odom_in_topic, self._odom_cb, 10)
+        self.create_subscription(Imu, self._imu_topic, self._imu_cb, 10)
+        self.create_subscription(NavSatFix, self._gps_fix_topic, self._fix_cb, 10)
+
+        self._publish_status()
+        self.get_logger().info(
+            f'OutdoorPoseFuser ready  odom_in={self._odom_in_topic}  '
+            f'odom_out={self._odom_out_topic}  gps_fix={self._gps_fix_topic}  '
+            f'publish_tf={self._publish_tf}'
+        )
+
+    # ------------------------------------------------------------------
+    # Subscription callbacks
+    # ------------------------------------------------------------------
+
+    def _odom_cb(self, msg: Odometry) -> None:
+        """Propagate the fused pose with wheel-odometry increments."""
+        raw_x = msg.pose.pose.position.x
+        raw_y = msg.pose.pose.position.y
+
+        if self._nav_x is None or self._nav_y is None:
+            self._nav_x = raw_x
+            self._nav_y = raw_y
+        elif self._last_raw_odom_x is not None and self._last_raw_odom_y is not None:
+            self._nav_x += raw_x - self._last_raw_odom_x
+            self._nav_y += raw_y - self._last_raw_odom_y
+
+        self._last_raw_odom_x = raw_x
+        self._last_raw_odom_y = raw_y
+        self._last_odom_msg = msg
+
+        if self._last_valid_fix_time is None:
+            self._set_state(NavState.ODOM_IMU_ONLY)
+        elif self._gps_fix_timed_out():
+            self._set_state(NavState.GPS_LOST)
+
+        self._publish_nav_odom(msg.header.stamp)
+
+    def _imu_cb(self, msg: Imu) -> None:
+        """Cache a planar yaw estimate from IMU orientation."""
+        q = msg.orientation
+        if not _quat_is_finite(q.x, q.y, q.z, q.w):
+            return
+        self._imu_yaw = _quat_to_yaw(q.x, q.y, q.z, q.w)
+
+    def _fix_cb(self, msg: NavSatFix) -> None:
+        """Blend the fused pose back toward the aligned GPS position."""
+        if not self._is_valid_fix(msg):
+            return
+
+        if self._last_odom_msg is None:
+            self.get_logger().warn(
+                'Received GPS fix before odometry; waiting for /odom before alignment',
+                throttle_duration_sec=2.0,
+            )
+            return
+
+        east_m, north_m = self._localizer.gps_to_enu(msg.latitude, msg.longitude)
+
+        if not self._aligned:
+            self._initialise_alignment(east_m, north_m)
+
+        if not self._aligned or self._gps_init_e is None or self._gps_init_n is None:
+            return
+
+        target_x = self._odom_init_x + (east_m - self._gps_init_e)  # type: ignore[operator]
+        target_y = self._odom_init_y + (north_m - self._gps_init_n)  # type: ignore[operator]
+
+        if self._nav_x is None or self._nav_y is None:
+            self._nav_x = self._last_odom_msg.pose.pose.position.x
+            self._nav_y = self._last_odom_msg.pose.pose.position.y
+
+        has_previous_fix = self._last_valid_fix_time is not None
+        jump_m = math.hypot(target_x - self._nav_x, target_y - self._nav_y)
+        if has_previous_fix and jump_m > self._gps_jump_reject_m:
+            self.get_logger().warn(
+                f'Rejecting GPS correction jump={jump_m:.2f}m '
+                f'(threshold={self._gps_jump_reject_m:.2f}m)',
+                throttle_duration_sec=1.0,
+            )
+            return
+
+        self._blend_toward(target_x, target_y, force=not has_previous_fix)
+        self._last_valid_fix_time = self._now_s()
+        self._set_state(NavState.GPS_READY if has_previous_fix else NavState.GPS_ALIGNING)
+
+        self._publish_nav_odom(self._last_odom_msg.header.stamp)
+
+    # ------------------------------------------------------------------
+    # Fusion helpers
+    # ------------------------------------------------------------------
+
+    def _initialise_alignment(self, east_m: float, north_m: float) -> None:
+        """Align the first valid GPS fix to the current odom position."""
+        if self._last_odom_msg is None:
+            return
+
+        raw_pose = self._last_odom_msg.pose.pose
+        if self._align_on_first_fix:
+            self._gps_init_e = east_m
+            self._gps_init_n = north_m
+            self._odom_init_x = raw_pose.position.x
+            self._odom_init_y = raw_pose.position.y
+        else:
+            self._gps_init_e = 0.0
+            self._gps_init_n = 0.0
+            self._odom_init_x = 0.0
+            self._odom_init_y = 0.0
+
+        self._aligned = True
+        self.get_logger().info(
+            'GPS alignment initialised at '
+            f'odom=({self._odom_init_x:.2f}, {self._odom_init_y:.2f})  '
+            f'enu=({east_m:.2f}, {north_m:.2f})'
+        )
+
+    def _blend_toward(self, target_x: float, target_y: float, *, force: bool) -> None:
+        """Move the fused pose toward the GPS-aligned target."""
+        if force or self._nav_x is None or self._nav_y is None:
+            self._nav_x = target_x
+            self._nav_y = target_y
+            return
+
+        self._nav_x += self._gps_alpha * (target_x - self._nav_x)
+        self._nav_y += self._gps_alpha * (target_y - self._nav_y)
+
+    def _publish_nav_odom(self, stamp) -> None:
+        """Publish the fused odometry and, optionally, the matching TF."""
+        if self._last_odom_msg is None or self._nav_x is None or self._nav_y is None:
+            return
+
+        raw_msg = self._last_odom_msg
+        raw_pose = raw_msg.pose.pose
+        fused_orientation = self._resolve_orientation(raw_pose.orientation)
+
+        nav_msg = Odometry()
+        nav_msg.header.stamp = stamp
+        nav_msg.header.frame_id = (raw_msg.header.frame_id or 'odom').strip() or 'odom'
+        nav_msg.child_frame_id = (raw_msg.child_frame_id or 'base_link').strip() or 'base_link'
+        nav_msg.pose.pose.position.x = self._nav_x
+        nav_msg.pose.pose.position.y = self._nav_y
+        nav_msg.pose.pose.position.z = raw_pose.position.z
+        nav_msg.pose.pose.orientation.x = fused_orientation[0]
+        nav_msg.pose.pose.orientation.y = fused_orientation[1]
+        nav_msg.pose.pose.orientation.z = fused_orientation[2]
+        nav_msg.pose.pose.orientation.w = fused_orientation[3]
+
+        if hasattr(nav_msg.pose, 'covariance') and hasattr(raw_msg.pose, 'covariance'):
+            nav_msg.pose.covariance = list(raw_msg.pose.covariance)
+        if hasattr(nav_msg, 'twist') and hasattr(raw_msg, 'twist'):
+            nav_msg.twist = raw_msg.twist
+
+        self._pub_odom.publish(nav_msg)
+
+        if self._tf_pub is not None:
+            tf_msg = TransformStamped()
+            tf_msg.header.stamp = stamp
+            tf_msg.header.frame_id = nav_msg.header.frame_id
+            tf_msg.child_frame_id = nav_msg.child_frame_id
+            tf_msg.transform.translation.x = self._nav_x
+            tf_msg.transform.translation.y = self._nav_y
+            tf_msg.transform.translation.z = raw_pose.position.z
+            tf_msg.transform.rotation.x = fused_orientation[0]
+            tf_msg.transform.rotation.y = fused_orientation[1]
+            tf_msg.transform.rotation.z = fused_orientation[2]
+            tf_msg.transform.rotation.w = fused_orientation[3]
+            self._tf_pub.sendTransform(tf_msg)
+
+    def _resolve_orientation(self, raw_orientation) -> tuple[float, float, float, float]:
+        """Pick IMU yaw when configured, otherwise keep the raw odom orientation."""
+        if self._use_imu_yaw and self._imu_yaw is not None:
+            return _yaw_to_quat(self._imu_yaw)
+        return (
+            raw_orientation.x,
+            raw_orientation.y,
+            raw_orientation.z,
+            raw_orientation.w,
+        )
+
+    def _is_valid_fix(self, msg: NavSatFix) -> bool:
+        """Accept fixes with a valid status and finite coordinates."""
+        if msg.status.status < 0:
+            return False
+        return (
+            math.isfinite(msg.latitude)
+            and math.isfinite(msg.longitude)
+        )
+
+    def _gps_fix_timed_out(self) -> bool:
+        """Return True when the last accepted GPS fix is older than fix_timeout_s."""
+        if self._last_valid_fix_time is None:
+            return False
+        return (self._now_s() - self._last_valid_fix_time) > self._fix_timeout_s
+
+    def _set_state(self, state: NavState) -> None:
+        if state == self._state:
+            return
+        self._state = state
+        self._publish_status()
+
+    def _publish_status(self) -> None:
+        msg = String()
+        msg.data = str(self._state.value)
+        self._pub_status.publish(msg)
+
+    def _now_s(self) -> float:
+        return self.get_clock().now().nanoseconds * 1e-9
+
+
+def _quat_to_yaw(qx: float, qy: float, qz: float, qw: float) -> float:
+    siny_cosp = 2.0 * (qw * qz + qx * qy)
+    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+    return math.atan2(siny_cosp, cosy_cosp)
+
+
+def _yaw_to_quat(yaw: float) -> tuple[float, float, float, float]:
+    half = yaw * 0.5
+    return (0.0, 0.0, math.sin(half), math.cos(half))
+
+
+def _quat_is_finite(qx: float, qy: float, qz: float, qw: float) -> bool:
+    return (
+        math.isfinite(qx)
+        and math.isfinite(qy)
+        and math.isfinite(qz)
+        and math.isfinite(qw)
+    )
+
+
+def main(args: list[str] | None = None) -> None:
+    rclpy.init(args=args)
+    node = OutdoorPoseFuserNode()
+    try:
+        rclpy.spin(node)
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()

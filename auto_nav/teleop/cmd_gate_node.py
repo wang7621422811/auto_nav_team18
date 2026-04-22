@@ -7,10 +7,11 @@ actually moves the robot.
 
 Decision logic (in priority order):
   1. Joystick lost          → publish zero
-  2. Emergency stop latched → publish zero
-  3. mode == MANUAL         → forward /cmd_vel_manual
-  4. mode == AUTO and deadman_ok → forward /cmd_vel_auto
-  5. anything else          → publish zero  (includes PAUSED, ABORTED)
+  2. Dead-man released      → publish zero
+  3. Emergency stop latched → publish zero
+  4. mode == MANUAL         → forward /cmd_vel_manual
+  5. mode == AUTO           → forward /cmd_vel_auto
+  6. anything else          → publish zero  (includes PAUSED, ABORTED)
 
 A watchdog timer runs at 10 Hz to guarantee a zero command is published
 within 100 ms of any safety condition triggering, even if no new cmd arrives.
@@ -126,16 +127,20 @@ class CmdGateNode(Node):
         if not self._connected:
             return _ZERO
 
+        # Both manual and autonomous motion require the dead-man to be held.
+        if not self._deadman_ok:
+            return _ZERO
+
         if self._estop:
             return _ZERO
 
         if self._mode == self.MANUAL:
             return self._cmd_manual
 
-        if self._mode == self.AUTO and self._deadman_ok:
+        if self._mode == self.AUTO:
             return self._cmd_auto
 
-        # PAUSED, ABORTED, or AUTO without deadman
+        # PAUSED, ABORTED, or any other unsupported mode
         return _ZERO
 
 

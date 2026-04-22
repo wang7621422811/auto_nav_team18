@@ -3,7 +3,8 @@ bringup.launch.py — Step 0: bring all hardware alive.
 
 Launches (in order of dependency):
   1. ariaNode         — Pioneer 3-AT chassis driver  → /odom /cmd_vel
-  2. odom_tf_broadcaster           — /odom pose        → /tf (odom→base_link)
+  2. odom_tf_broadcaster OR outdoor_pose_fuser
+                       — Step-0 TF from /odom, or GPS-aligned /nav/odom + TF
   3. sick_scan_xd OR lakibeam_ros2 — LiDAR driver      → /scan
   4. depthai_ros_driver             — OAK-D V2 camera   → /camera/*   (optional)
   5. joy_node                       — Bluetooth gamepad → /joy
@@ -22,6 +23,7 @@ CLI arguments (all have defaults; override on command line):
   use_camera:=true | false  (false skips depthai_ros_driver; safe when camera not available)
   camera_mx_id:=          (empty = auto)
   use_sim_time:=false
+  use_gps:=false
   aria_pkg:=ariaNode
   aria_exec:=ariaNode     (confirmed via `ros2 pkg executables ariaNode` on pioneer1)
 """
@@ -86,6 +88,10 @@ def generate_launch_description() -> LaunchDescription:
             description='Use simulation clock',
         ),
         DeclareLaunchArgument(
+            'use_gps', default_value='false',
+            description='GPS outdoor mode: launch outdoor_pose_fuser instead of odom_tf_broadcaster',
+        ),
+        DeclareLaunchArgument(
             'joy_dev', default_value='/dev/input/js0',
             description='Joystick device path',
         ),
@@ -116,7 +122,6 @@ def generate_launch_description() -> LaunchDescription:
     lakibeam_ip  = LaunchConfiguration('lakibeam_ip')
     camera_mx_id = LaunchConfiguration('camera_mx_id')
     use_sim_time = LaunchConfiguration('use_sim_time')
-    joy_dev      = LaunchConfiguration('joy_dev')
     aria_pkg     = LaunchConfiguration('aria_pkg')
     aria_exec    = LaunchConfiguration('aria_exec')
 
@@ -149,13 +154,38 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # ---- 1b. Convert /odom pose to the standard odom -> base_link TF -----
-    odom_tf_node = Node(
-        package='auto_nav',
-        executable='odom_tf_broadcaster',
-        name='odom_tf_broadcaster',
-        output='screen',
-        parameters=[{'use_sim_time': use_sim_time}],
-    )
+    def _tf_nodes(context, *args, **kwargs):
+        """Select the TF source: raw odom in bench mode, GPS fuser outdoors."""
+        use_gps = context.launch_configurations.get('use_gps', 'false').lower() == 'true'
+        sim_params = {
+            'use_sim_time': context.launch_configurations.get('use_sim_time', 'false') == 'true'
+        }
+        if use_gps:
+            LogInfo(
+                msg='[bringup] GPS mode enabled: outdoor_pose_fuser publishes /nav/odom and TF'
+            ).execute(context)
+            return [
+                Node(
+                    package='auto_nav',
+                    executable='outdoor_pose_fuser',
+                    name='outdoor_pose_fuser',
+                    output='screen',
+                    parameters=[
+                        _cfg('gps.yaml'),
+                        sim_params,
+                    ],
+                )
+            ]
+
+        return [
+            Node(
+                package='auto_nav',
+                executable='odom_tf_broadcaster',
+                name='odom_tf_broadcaster',
+                output='screen',
+                parameters=[sim_params],
+            )
+        ]
 
     # ---- 2b. Lakibeam LiDAR -----------------------------------------------
     lakibeam_node = Node(
@@ -336,7 +366,7 @@ def generate_launch_description() -> LaunchDescription:
         args + [
             LogInfo(msg='=== auto_nav bringup: Step 0 ==='),
             aria_node,
-            odom_tf_node,
+            OpaqueFunction(function=_tf_nodes),
             OpaqueFunction(function=_lidar_nodes),
             OpaqueFunction(function=_camera_nodes),
             OpaqueFunction(function=_gamepad_nodes),

@@ -1,0 +1,24 @@
+# GPS outdoor navigation parameters.
+#
+# Keep gps_origin_* aligned with config/waypoints_real_gps.yaml so the waypoint
+# ENU conversion and the live GPS-fusion ENU conversion use the same reference.
+
+outdoor_pose_fuser:
+  ros__parameters:
+    gps_fix_topic: "/fix"
+    imu_topic: "/imu/data"
+    odom_in_topic: "/odom"
+    odom_out_topic: "/nav/odom"
+    status_topic: "/nav/status"
+    publish_tf: true
+
+    # Shared ENU origin for live GPS fixes.
+    gps_origin_lat: 51.4788
+    gps_origin_lon: -0.0106
+
+    # Lightweight GPS / odom fusion tuning.
+    gps_position_alpha: 0.1
+    gps_jump_reject_m: 8.0
+    fix_timeout_s: 2.0
+    use_imu_yaw: true
+    align_on_first_valid_fix: true

@@ -152,14 +152,11 @@ def _make_mode_manager():
     node = ModeManagerNode.__new__(ModeManagerNode)
     node._logger              = MagicMock()
     node._pub_mode            = MagicMock()
-    node._pub_estop           = MagicMock()
     node._mode                = ModeManagerNode.MANUAL
     node._prev_btn_auto       = False
     node._prev_btn_manual     = False
-    node._prev_btn_emergency  = False
     node._connected           = True
     node._deadman_ok          = False
-    node._estop_latched       = False
     return node
 
 
@@ -233,6 +230,14 @@ class TestJoyMapper(unittest.TestCase):
         node._joy_cb(_make_joy(buttons=buttons))
         last_call = node._pub_emergency.publish.call_args[0][0]
         self.assertTrue(last_call.data)
+
+    def test_negative_button_index_is_disabled(self):
+        node = _make_joy_mapper(btn_emergency=-1)
+        buttons = [0] * 12
+        buttons[-1] = 1
+        node._joy_cb(_make_joy(buttons=buttons))
+        last_call = node._pub_emergency.publish.call_args[0][0]
+        self.assertFalse(last_call.data)
 
     def test_out_of_range_button_index_is_false(self):
         """Controller with fewer buttons than configured index → no crash, False."""
@@ -322,19 +327,6 @@ class TestModeManager(unittest.TestCase):
         node._btn_manual_cb(_Bool(data=True))  # press O
         self.assertEqual(node._mode, ModeManagerNode.MANUAL)
 
-    def test_btn_manual_clears_estop(self):
-        node = _make_mode_manager()
-        node._estop_latched = True
-        node._btn_manual_cb(_Bool(data=True))
-        self.assertFalse(node._estop_latched)
-        node._pub_estop.publish.assert_called()
-
-    def test_btn_emergency_sets_aborted(self):
-        node = _make_mode_manager()
-        node._btn_emergency_cb(_Bool(data=True))
-        self.assertEqual(node._mode, ModeManagerNode.ABORTED)
-        self.assertTrue(node._estop_latched)
-
     # ---- Joystick disconnect ---------------------------------------------
 
     def test_disconnect_forces_manual(self):
@@ -413,9 +405,10 @@ class TestCmdGate(unittest.TestCase):
 
     # ---- MANUAL mode -----------------------------------------------------
 
-    def test_manual_mode_forwards_manual_cmd(self):
+    def test_manual_mode_with_deadman_forwards_manual_cmd(self):
         node = _make_cmd_gate()
         node._mode = CmdGateNode.MANUAL
+        node._deadman_ok = True
         manual_cmd = _Twist()
         manual_cmd.linear.x = 0.5
         node._cmd_manual = manual_cmd
@@ -423,9 +416,21 @@ class TestCmdGate(unittest.TestCase):
         out = self._last_published(node)
         self.assertIs(out, manual_cmd)
 
+    def test_manual_mode_without_deadman_publishes_zero(self):
+        node = _make_cmd_gate()
+        node._mode = CmdGateNode.MANUAL
+        node._deadman_ok = False
+        manual_cmd = _Twist()
+        manual_cmd.linear.x = 0.5
+        node._cmd_manual = manual_cmd
+        node._gate()
+        out = self._last_published(node)
+        self.assertIsNot(out, manual_cmd)
+
     def test_manual_mode_ignores_auto_cmd(self):
         node = _make_cmd_gate()
         node._mode = CmdGateNode.MANUAL
+        node._deadman_ok = True
         auto_cmd = _Twist()
         auto_cmd.linear.x = 1.0
         node._cmd_auto = auto_cmd

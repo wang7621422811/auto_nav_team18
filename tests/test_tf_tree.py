@@ -98,11 +98,11 @@ def _install_launch_stubs() -> None:
     sys.modules['ament_index_python.packages'] = ament_packages_mod
 
 
-def _load_bringup_launch_module():
+def _load_launch_module(filename: str):
     _install_launch_stubs()
     spec = importlib.util.spec_from_file_location(
-        'bringup_launch_under_test',
-        _ROOT / 'launch' / 'bringup.launch.py',
+        filename.replace('.', '_'),
+        _ROOT / 'launch' / filename,
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -123,7 +123,7 @@ def test_minimal_tf_frame_contract_matches_docs() -> None:
 
 
 def test_bringup_launch_publishes_static_sensor_tf_chain() -> None:
-    module = _load_bringup_launch_module()
+    module = _load_launch_module('bringup.launch.py')
     launch_description = module.generate_launch_description()
 
     static_tf_op = next(
@@ -171,22 +171,51 @@ def test_bringup_launch_publishes_static_sensor_tf_chain() -> None:
     ]
 
 
-def test_bringup_launch_includes_odom_tf_broadcaster() -> None:
-    module = _load_bringup_launch_module()
+def test_bringup_launch_includes_odom_tf_broadcaster_without_gps() -> None:
+    module = _load_launch_module('bringup.launch.py')
     launch_description = module.generate_launch_description()
 
-    odom_tf_node = next(
+    tf_op = next(
         entity
         for entity in launch_description.entities
-        if isinstance(entity, _FakeNode) and entity.name == 'odom_tf_broadcaster'
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_tf_nodes'
     )
+
+    context = types.SimpleNamespace(
+        launch_configurations={'use_gps': 'false', 'use_sim_time': 'false'}
+    )
+    nodes = tf_op.function(context)
+    assert len(nodes) == 1
+    odom_tf_node = nodes[0]
 
     assert odom_tf_node.package == 'auto_nav'
     assert odom_tf_node.executable == 'odom_tf_broadcaster'
 
 
+def test_bringup_launch_uses_outdoor_pose_fuser_with_gps() -> None:
+    module = _load_launch_module('bringup.launch.py')
+    launch_description = module.generate_launch_description()
+
+    tf_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_tf_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={'use_gps': 'true', 'use_sim_time': 'false'}
+    )
+    nodes = tf_op.function(context)
+    assert len(nodes) == 1
+
+    gps_node = nodes[0]
+    assert gps_node.package == 'auto_nav'
+    assert gps_node.executable == 'outdoor_pose_fuser'
+    assert gps_node.name == 'outdoor_pose_fuser'
+
+
 def test_bringup_launch_isolates_vendor_sick_tf_from_main_tree() -> None:
-    module = _load_bringup_launch_module()
+    module = _load_launch_module('bringup.launch.py')
     launch_description = module.generate_launch_description()
 
     lidar_op = next(
@@ -203,3 +232,96 @@ def test_bringup_launch_isolates_vendor_sick_tf_from_main_tree() -> None:
     assert sick_node.name == 'sick_scan'
     assert ('/tf', '/sick_scan/tf') in sick_node.remappings
     assert ('/tf_static', '/sick_scan/tf_static') in sick_node.remappings
+
+
+def test_navigation_launch_remaps_odom_in_gps_mode() -> None:
+    module = _load_launch_module('navigation.launch.py')
+    launch_description = module.generate_launch_description()
+
+    nav_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_navigation_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={
+            'use_gps': 'true',
+            'use_sim_time': 'false',
+            'waypoints_file': '',
+        }
+    )
+    nodes = nav_op.function(context)
+    by_name = {node.name: node for node in nodes}
+
+    for name in [
+        'home_pose_recorder',
+        'path_follower',
+        'obstacle_guard',
+        'gap_planner',
+        'weave_planner',
+    ]:
+        assert ('/odom', '/nav/odom') in by_name[name].remappings
+
+    path_param_overrides = [
+        params
+        for params in by_name['path_follower'].parameters
+        if isinstance(params, dict)
+    ]
+    assert {
+        'waypoints_file': str(_ROOT / 'config' / 'waypoints_real_gps.yaml'),
+        'use_sim_time': False,
+    } in path_param_overrides
+
+
+def test_navigation_launch_defaults_to_local_waypoints_without_gps() -> None:
+    module = _load_launch_module('navigation.launch.py')
+    launch_description = module.generate_launch_description()
+
+    nav_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_navigation_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={
+            'use_gps': 'false',
+            'use_sim_time': 'false',
+            'waypoints_file': '',
+        }
+    )
+    nodes = nav_op.function(context)
+    by_name = {node.name: node for node in nodes}
+
+    assert ('/odom', '/nav/odom') not in by_name['path_follower'].remappings
+    path_param_overrides = [
+        params
+        for params in by_name['path_follower'].parameters
+        if isinstance(params, dict)
+    ]
+    assert {
+        'waypoints_file': str(_ROOT / 'config' / 'waypoints_data.yaml'),
+        'use_sim_time': False,
+    } in path_param_overrides
+
+
+def test_mission_launch_remaps_controller_odom_in_gps_mode() -> None:
+    module = _load_launch_module('mission.launch.py')
+    launch_description = module.generate_launch_description()
+
+    mission_op = next(
+        entity
+        for entity in launch_description.entities
+        if isinstance(entity, _FakeOpaqueFunction) and entity.function.__name__ == '_mission_nodes'
+    )
+
+    context = types.SimpleNamespace(
+        launch_configurations={'use_gps': 'true', 'use_sim_time': 'false'}
+    )
+    nodes = mission_op.function(context)
+    by_name = {node.name: node for node in nodes}
+
+    assert ('/odom', '/nav/odom') in by_name['mission_controller'].remappings
+    assert by_name['journey_logger'].remappings == []
+    assert by_name['summary_generator'].remappings == []

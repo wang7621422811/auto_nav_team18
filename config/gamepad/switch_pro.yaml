@@ -48,7 +48,7 @@
   ros__parameters:
     btn_auto_mode: 0       # B → enable AUTO
     btn_manual_mode: 1     # A → enable MANUAL
-    btn_emergency_stop: 3  # X → E-stop  (verify: press X, check buttons[3] in /joy)
+    btn_emergency_stop: -1 # Disabled: X no longer maps to hand-controller E-stop
 
 /cmd_gate:
   ros__parameters:

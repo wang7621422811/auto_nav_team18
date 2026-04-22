@@ -31,7 +31,7 @@ Subscribes
   /waypoint/status     (std_msgs/String)           — PathFollowerNode
   /navigation/segment  (std_msgs/String)           — PathFollowerNode
   /deadman_ok          (std_msgs/Bool)             — GamepadWatchdogNode
-  /emergency_stop      (std_msgs/Bool)             — ModeManagerNode / ObstacleGuard
+  /emergency_stop      (std_msgs/Bool)             — ObstacleGuardNode
   /marker/detection    (geometry_msgs/PoseStamped) — ConeDetectorNode
   /object/detection    (std_msgs/String)           — ObjectDetectorNode (JSON)
   /photo/saved         (std_msgs/String)           — PhotoCaptureNode

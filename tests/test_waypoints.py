@@ -416,6 +416,31 @@ class TestWaypointProviderXY(unittest.TestCase):
         self.assertEqual(len(prov), 1)
         self.assertAlmostEqual(prov[0].x, 7.0)
 
+    def test_repo_real_gps_waypoints_file_loads(self):
+        """The repository GPS sample file should stay loadable by WaypointProvider."""
+        prov = WaypointProvider(REPO_ROOT / 'config' / 'waypoints_real_gps.yaml')
+        self.assertGreaterEqual(len(prov), 2)
+
+    def test_repo_real_gps_waypoints_file_declares_origin(self):
+        path = REPO_ROOT / 'config' / 'waypoints_real_gps.yaml'
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        self.assertIn('origin', data)
+        self.assertIn('waypoints', data)
+        self.assertTrue(all(wp.get('type') == 'gps' for wp in data['waypoints']))
+
+    def test_repo_gps_config_origin_matches_real_gps_waypoints(self):
+        with open(REPO_ROOT / 'config' / 'gps.yaml') as f:
+            gps_cfg = yaml.safe_load(f)
+        with open(REPO_ROOT / 'config' / 'waypoints_real_gps.yaml') as f:
+            waypoint_cfg = yaml.safe_load(f)
+
+        gps_params = gps_cfg['outdoor_pose_fuser']['ros__parameters']
+        waypoint_origin = waypoint_cfg['origin']
+
+        self.assertEqual(gps_params['gps_origin_lat'], waypoint_origin['lat'])
+        self.assertEqual(gps_params['gps_origin_lon'], waypoint_origin['lon'])
+
     def test_repo_waypoints_match_new_world_orange_cones(self):
         """Keep config/waypoints_data.yaml aligned with orange cones in new_world.sdf."""
         world_path = REPO_ROOT / 'auto_nav' / 'simulation' / 'sim_worlds' / 'new_world.sdf'

@@ -54,6 +54,7 @@ setup(
             'home_pose_recorder = auto_nav.mission.home_pose_recorder:main',
             'odom_tf_broadcaster = auto_nav.odom_tf_broadcaster:main',
             'path_follower      = auto_nav.navigation.path_follower:main',
+            'outdoor_pose_fuser = auto_nav.navigation.outdoor_pose_fuser:main',
             # Step 3: LiDAR avoidance + weaving
             'obstacle_guard     = auto_nav.navigation.obstacle_guard:main',
             'gap_planner        = auto_nav.navigation.gap_planner:main',

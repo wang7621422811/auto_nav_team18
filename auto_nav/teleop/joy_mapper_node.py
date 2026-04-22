@@ -11,6 +11,7 @@ Publishes:
   /joy/btn_auto      (std_msgs/Bool)  True while AUTO-mode button is held
   /joy/btn_manual    (std_msgs/Bool)  True while MANUAL-mode button is held
   /joy/btn_emergency (std_msgs/Bool)  True while emergency-stop button is held
+                                      (-1 button index disables the mapping)
 """
 
 import rclpy
@@ -59,8 +60,8 @@ class JoyMapperNode(Node):
 
     def _joy_cb(self, msg: Joy) -> None:
         def _pressed(idx: int) -> bool:
-            """Return True if button index is within range and pressed."""
-            return bool(msg.buttons[idx]) if idx < len(msg.buttons) else False
+            """Return True if button index is valid, enabled, and pressed."""
+            return bool(msg.buttons[idx]) if 0 <= idx < len(msg.buttons) else False
 
         self._pub_auto.publish(Bool(data=_pressed(self._btn_auto)))
         self._pub_manual.publish(Bool(data=_pressed(self._btn_manual)))

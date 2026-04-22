@@ -11,7 +11,7 @@ Nodes started here:
   teleop_twist_joy  — /joy axes → /cmd_vel_manual
   joy_mapper        — /joy buttons → /joy/btn_* semantic topics
   gamepad_watchdog  — /deadman_ok  /joy_connected
-  mode_manager      — /control_mode  /emergency_stop
+  mode_manager      — /control_mode
   cmd_gate          — safety arbiter → /cmd_vel_safe (chassis input)
 
 CLI arguments:
